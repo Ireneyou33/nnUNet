@@ -15,6 +15,7 @@ from copy import deepcopy
 from multiprocessing.pool import Pool
 
 import numpy as np
+import pandas as pd
 from collections import OrderedDict
 
 from batchgenerators.utilities.file_and_folder_operations import *
@@ -629,7 +630,7 @@ if __name__ == "__main__":
     """
     HGGLGG = 'LGG'
 
-    task_name = "Task503_BraTS2021"
+    task_name = "Task502_BraTS2021"
     downloaded_data_dir = "/home/anning/Dataset/RawData/MICCAI_BraTS2021_TrainingData"
     # downloaded_data_dir_val = "/home/fabian/Downloads/MICCAI_BraTS2021_ValidationData"
     downloaded_data_dir_val = None
@@ -645,9 +646,24 @@ if __name__ == "__main__":
     maybe_mkdir_p(target_imagesTs)
     maybe_mkdir_p(target_labelsTr)
 
+    # 挑选符合HGG的数据
+    grading_file = '/home/anning/project/TTbraTS/nnUNet/nnunet/brats2021/grading_res.csv'
+    if os.path.isfile(grading_file):
+        df_grad = pd.read_csv(grading_file, index_col='name')
+    else:
+        exit(1)
+
     patient_names = []
     cur = join(downloaded_data_dir)
     for p in subdirs(cur, join=False):
+        # 挑选符合HGG的数据
+        if df_grad is not None:
+            grading_pvalue = df_grad.loc[p]['grading_pvalue']
+            LGG, HGG = grading_pvalue[1:-1].split()
+            if not np.isclose(float(LGG), 1):
+                continue
+        else:
+            grad = ' '
         print(p)
         patdir = join(cur, p)
         patient_name = p
@@ -692,8 +708,8 @@ if __name__ == "__main__":
     json_dict['name'] = "BraTS2021"
     json_dict['description'] = "nothing"
     json_dict['tensorImageSize'] = "4D"
-    json_dict['reference'] = "see BraTS2020"
-    json_dict['licence'] = "see BraTS2020 license"
+    json_dict['reference'] = "see BraTS2021"
+    json_dict['licence'] = "see BraTS2021 license"
     json_dict['release'] = "0.0"
     json_dict['modality'] = {
         "0": "T1",

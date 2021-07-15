@@ -647,7 +647,7 @@ if __name__ == "__main__":
     maybe_mkdir_p(target_labelsTr)
 
     # 挑选符合HGG的数据
-    grading_file = '../brats2021/grading_res.csv'
+    grading_file = '/home/anning/project/TTbraTS/nnUNet/nnunet/brats2021/grading_res.csv'
     if os.path.isfile(grading_file):
         df_grad = pd.read_csv(grading_file, index_col='name')
     else:
