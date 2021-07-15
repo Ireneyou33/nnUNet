@@ -18,7 +18,7 @@ def get_brats_regions():
     regions = {
         "whole tumor": (1, 2, 3),
         "tumor core": (2, 3),
-        "enhancing tumor": (3,)
+        "enhancing tumor": (2,)
     }
     return regions
 
@@ -111,5 +111,8 @@ def evaluate_regions(folder_predicted: str, folder_gt: str, regions: dict, proce
 
 
 if __name__ == '__main__':
-    collect_cv_niftis('./', './cv_niftis')
-    evaluate_regions('./cv_niftis/', './gt_niftis/', get_brats_regions())
+    # collect_cv_niftis('./', './cv_niftis')
+    # evaluate_regions('./cv_niftis/', './gt_niftis/', get_brats_regions())
+    ref = '/home/anning/Dataset/ProjData/nnunet/RESULTS_FOLDER/nnUNet/3d_fullres/Task501_BraTS2021/nnUNetTrainerV2__nnUNetPlansv2.1/fold_0/label_val_0'
+    pred = '/home/anning/Dataset/ProjData/nnunet/RESULTS_FOLDER/nnUNet/3d_fullres/Task501_BraTS2021/nnUNetTrainerV2__nnUNetPlansv2.1/fold_0/label_pred_0'
+    evaluate_regions(pred, ref, get_brats_regions())

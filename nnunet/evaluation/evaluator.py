@@ -480,4 +480,4 @@ def nnunet_evaluate_folder():
                                                                        "this case that would not gie any useful "
                                                                        "information.")
     args = parser.parse_args()
-    return evaluate_folder(args.ref, args.pred, args.l)
+    return evaluate_folder(args.ref, args.pred, args.l, advanced=True)
