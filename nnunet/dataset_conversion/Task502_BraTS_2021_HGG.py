@@ -651,7 +651,7 @@ if __name__ == "__main__":
     if os.path.isfile(grading_file):
         df_grad = pd.read_csv(grading_file, index_col='name')
     else:
-        df_grad = None
+        exit(1)
 
     patient_names = []
     cur = join(downloaded_data_dir)
@@ -660,7 +660,7 @@ if __name__ == "__main__":
         if df_grad is not None:
             grading_pvalue = df_grad.loc[p]['grading_pvalue']
             LGG, HGG = grading_pvalue[1:-1].split()
-            if np.isclose(float(HGG), 1):
+            if not np.isclose(float(HGG), 1):
                 continue
         else:
             grad = ' '

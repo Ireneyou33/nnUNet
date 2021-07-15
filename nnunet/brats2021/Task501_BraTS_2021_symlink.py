@@ -13,6 +13,7 @@
 #    limitations under the License.
 
 from batchgenerators.utilities.file_and_folder_operations import *
+from nnunet.dataset_conversion.Task043_BraTS_2019 import copy_BraTS_segmentation_and_convert_labels
 
 if __name__ == "__main__":
     """
@@ -70,6 +71,6 @@ if __name__ == "__main__":
         if not os.path.isfile(join(train_images_val, patient_name + "_0003.nii.gz")):
             os.symlink(flair, join(train_images_val, patient_name + "_0003.nii.gz"))
         if not os.path.isfile(join(train_label_val, patient_name + ".nii.gz")):
-            os.symlink(seg, join(train_label_val, patient_name + ".nii.gz"))
+            copy_BraTS_segmentation_and_convert_labels(seg, join(train_label_val, patient_name + ".nii.gz"))
 
     # nnUNet_predict -i /home/anning/Dataset/ProjData/nnunet/RESULTS_FOLDER/nnUNet/3d_fullres/Task501_BraTS2021/nnUNetTrainerV2__nnUNetPlansv2.1/fold_0/images_val_0 -o /home/anning/Dataset/ProjData/nnunet/RESULTS_FOLDER/nnUNet/3d_fullres/Task501_BraTS2021/nnUNetTrainerV2__nnUNetPlansv2.1/fold_0/label_pred_0 -t 0 -m 3d_fullres
