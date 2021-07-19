@@ -1,4 +1,5 @@
 import collections
+import os.path
 from itertools import repeat
 import numpy as np
 import scipy
@@ -77,6 +78,9 @@ def plot_voxel_enhance(arr, arr_mask=None, out_file=None, plot_type=None):  # ar
 
 
 def plot_voxel_enhance_brats(arr, arr_mask=None, out_file=None, plot_type=None):  # arr: zxy
+    if os.path.isfile(out_file):
+        print(f"Exite：{out_file}")
+        return
 
     rows = cols = int(round(np.sqrt(arr.shape[0])))
     img_height = arr.shape[1]
@@ -102,7 +106,7 @@ def plot_voxel_enhance_brats(arr, arr_mask=None, out_file=None, plot_type=None):
     else:
         if plot_type == 'contours':  # 添加掩码轮廓图
             res_img = cv2.cvtColor(res_img, cv2.COLOR_GRAY2BGR)
-            for thres, color in zip([2, 4, 1], [(0, 255, 0), (0, 0, 255), (255, 0, 0)]):
+            for thres, color in zip([1, 3, 2], [(0, 255, 0), (0, 0, 255), (255, 0, 0)]):
                 res_mask_color = np.zeros_like(res_mask_img, dtype=np.uint8)
                 res_mask_color[res_mask_img == thres] = 2
                 ret, binary = cv2.threshold(res_mask_color, 1, 255, cv2.THRESH_BINARY)
@@ -111,7 +115,7 @@ def plot_voxel_enhance_brats(arr, arr_mask=None, out_file=None, plot_type=None):
             cv2.imwrite(out_file, res_img)
         elif plot_type == 'fillpoly':  # 添加掩码填充图
             res_img = cv2.cvtColor(res_img, cv2.COLOR_GRAY2BGR)
-            for thres, color in zip([2, 4, 1], [(0, 255, 0), (0, 0, 255), (255, 0, 0)]):
+            for thres, color in zip([1, 3, 2], [(0, 255, 0), (0, 0, 255), (255, 0, 0)]):
                 res_mask_color = np.zeros_like(res_mask_img, dtype=np.uint8)
                 res_mask_color[res_mask_img == thres] = 2
                 ret, binary = cv2.threshold(res_mask_color, 1, 255, cv2.THRESH_BINARY)
