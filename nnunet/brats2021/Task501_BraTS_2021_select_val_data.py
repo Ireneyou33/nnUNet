@@ -24,7 +24,7 @@ if __name__ == "__main__":
     # downloaded_data_dir_val = "/home/fabian/Downloads/MICCAI_BraTS2021_ValidationData"
     downloaded_data_dir_val = None
     split_final_file = "/home/anning/Dataset/ProjData/nnunet/nnUNet_preprocessed/Task501_BraTS2021/splits_final.pkl"
-    result_dir = "/home/anning/Dataset/ProjData/nnunet/RESULTS_FOLDER/nnUNet/3d_fullres/Task501_BraTS2021/nnUNetTrainerV2__nnUNetPlansv2.1/fold_0"
+    result_dir = "/home/anning/Dataset/ProjData/nnunet/RESULTS_FOLDER/nnUNet/3d_fullres/Task501_BraTS2021/nnUNetTrainerV2__nnUNetPlansv2.1/fold_0/"
 
     flod = 0
     with open(split_final_file, 'rb') as f:
