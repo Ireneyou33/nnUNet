@@ -630,7 +630,7 @@ if __name__ == "__main__":
     """
     HGGLGG = 'LGG'
 
-    task_name = "Task502_BraTS2021"
+    task_name = "Task503_BraTS2021"
     downloaded_data_dir = "/home/anning/Dataset/RawData/MICCAI_BraTS2021_TrainingData"
     # downloaded_data_dir_val = "/home/fabian/Downloads/MICCAI_BraTS2021_ValidationData"
     downloaded_data_dir_val = None
