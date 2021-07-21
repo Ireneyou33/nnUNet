@@ -35,9 +35,9 @@ if __name__ == "__main__":
     # downloaded_data_dir_val = "/home/fabian/Downloads/MICCAI_BraTS2021_ValidationData"
     downloaded_data_dir_val = None
 
-    data_dir_pred = "/home/anning/Dataset/ProjData/nnunet/RESULTS_FOLDER/nnUNet/3d_fullres/Task501_BraTS2021/nnUNetTrainerV2__nnUNetPlansv2.1/fold_0/validation_raw_best"
+    data_dir_pred = "/home/anning/Dataset/ProjData/nnunet/RESULTS_FOLDER/nnUNet/3d_fullres/Task501_BraTS2021/nnUNetTrainerV2BraTS_Adam__nnUNetPlansv2.1/fold_0/validation_raw_best"
     data_dir_gt = "/home/anning/Dataset/ProjData/nnunet/nnUNet_raw_data_base/nnUNet_raw_data/Task501_BraTS2021/labelsTr"
-    img_dir = "/home/anning/Dataset/ProjData/BraTS2021/QC_IMG_EVAL_BASELINE"  # 输出图片的文件夹
+    img_dir = "/home/anning/Dataset/ProjData/BraTS2021/QC_IMG_EVAL_ALL"  # 输出图片的文件夹
 
     evaluate_file = os.path.join(data_dir_pred, "results.csv")  # 预测结果的评价指标文件
     grading_file = '/home/anning/project/TTbraTS/nnUNet/nnunet/brats2021/grading_res.csv'  # HGG_LGG结果文件
