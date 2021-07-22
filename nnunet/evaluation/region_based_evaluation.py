@@ -18,7 +18,7 @@ def get_brats_regions():
     regions = {
         "whole tumor": (1, 2, 3),
         "tumor core": (2, 3),
-        "enhancing tumor": (2,)
+        "enhancing tumor": (3,)
     }
     return regions
 

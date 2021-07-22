@@ -39,7 +39,7 @@ class nnUNetPlusPlusTrainerV2BraTSRegions_DA3_BN(nnUNetPlusPlusTrainerV2_DA3_BN)
         super().__init__(plans_file, fold, output_folder, dataset_directory, batch_dice, stage, unpack_data,
                          deterministic, fp16)
         self.regions = get_brats_regions()
-        self.regions_class_order = (1, 2, 3)
+        self.regions_class_order = (1, 3, 2)  # 如果是(1, 2, 3)，和baseline的标签不同，需要改为(1, 3, 2)
         self.loss = DC_and_BCE_loss({}, {'batch_dice': False, 'do_bg': True, 'smooth': 0})
 
     def process_plans(self, plans):
