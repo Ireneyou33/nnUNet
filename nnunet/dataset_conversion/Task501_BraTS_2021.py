@@ -380,6 +380,7 @@ def evaluate_BraTS_case(arr: np.ndarray, arr_gt: np.ndarray):
 
 
 def load_evaluate(filename_gt: str, filename_pred: str):
+    print(os.path.basename(filename_gt))
     arr_pred = sitk.GetArrayFromImage(sitk.ReadImage(filename_pred))
     arr_gt = sitk.GetArrayFromImage(sitk.ReadImage(filename_gt))
     return evaluate_BraTS_case(arr_pred, arr_gt)
