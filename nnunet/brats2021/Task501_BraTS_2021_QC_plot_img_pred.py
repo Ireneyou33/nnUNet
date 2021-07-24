@@ -42,6 +42,12 @@ if __name__ == "__main__":
     evaluate_file = os.path.join(data_dir_pred, "results.csv")  # 预测结果的评价指标文件
     grading_file = '/home/anning/project/TTbraTS/nnUNet/nnunet/brats2021/grading_res.csv'  # HGG_LGG结果文件
 
+    print(f'data_dir_pred : {data_dir_pred}')
+    print(f'data_dir_gt   : {data_dir_gt}')
+    print(f'img_dir   : {img_dir}')
+    print(f'evaluate_file   : {evaluate_file}')
+    print(f'grading_file   : {grading_file}')
+
     target_base = join(nnUNet_raw_data, task_name)
     target_imagesTr = join(target_base, "imagesTr")
     target_imagesVal = join(target_base, "imagesVal")
