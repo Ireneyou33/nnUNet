@@ -7,7 +7,7 @@ from nnunet.dataset_conversion.Task501_BraTS_2021 import evaluate_BraTS_folder
 
 
 if __name__ == "__main__":
-    data_dir_pred = "/home/anning/Dataset/ProjData/nnunet/RESULTS_FOLDER/nnUNet/3d_fullres/Task501_BraTS2021/nnUNetTrainerV2BraTS_Adam__nnUNetPlansv2.1/fold_0/validation_raw_best"
+    data_dir_pred = "/home/anning/Dataset/ProjData/nnunet/RESULTS_FOLDER/nnUNet/3d_fullres/Task501_BraTS2021/nnUNetPlusPlusTrainerV2BraTS_Adam__nnUNetPlansv2.1/fold_0/validation_raw_best"
     data_dir_gt = "/home/anning/Dataset/ProjData/nnunet/nnUNet_raw_data_base/nnUNet_raw_data/Task501_BraTS2021/labelsTr"
 
     print(f'data_dir_pred : {data_dir_pred}')
