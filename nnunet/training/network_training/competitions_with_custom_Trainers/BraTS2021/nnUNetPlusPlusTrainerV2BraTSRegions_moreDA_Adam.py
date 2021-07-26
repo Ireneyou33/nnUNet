@@ -20,6 +20,25 @@ from nnunet.training.network_training.competitions_with_custom_Trainers.BraTS202
     nnUNetPlusPlusTrainerV2BraTSRegions_DA3_BN_BD, nnUNetPlusPlusTrainerV2BraTSRegions_DA4_BN, nnUNetPlusPlusTrainerV2BraTSRegions_DA4_BN_BD
 
 
+class nnUNetPlusPlusTrainerV2BraTS_Adam_500(nnUNetPlusPlusTrainerV2):
+    """
+    Info for Fabian: same as internal nnUNetPlusPlusTrainerV2_2
+    """
+
+    def __init__(self, plans_file, fold, output_folder=None, dataset_directory=None, batch_dice=True, stage=None,
+                 unpack_data=True, deterministic=True, fp16=False):
+        super().__init__(plans_file, fold, output_folder, dataset_directory, batch_dice, stage, unpack_data,
+                         deterministic, fp16)
+        self.patience = 30  # 如果 50 个轮次MA没有减低，停止训练
+        self.max_num_epochs = 500  # anning 2021-07-13 from 1000 to 160 40000 iterations
+        self.initial_lr = 1e-3  # anning 2021-07-13 from 1e-2 to 1e-3
+
+    def initialize_optimizer_and_scheduler(self):
+        assert self.network is not None, "self.initialize_network must be called first"
+        self.optimizer = torch.optim.AdamW(self.network.parameters(), self.initial_lr)
+        self.lr_scheduler = None
+
+
 class nnUNetPlusPlusTrainerV2BraTS_Adam(nnUNetPlusPlusTrainerV2):
     """
     Info for Fabian: same as internal nnUNetPlusPlusTrainerV2_2
