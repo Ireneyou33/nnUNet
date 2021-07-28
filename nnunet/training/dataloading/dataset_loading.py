@@ -23,6 +23,20 @@ from nnunet.paths import preprocessing_output_dir
 from batchgenerators.utilities.file_and_folder_operations import *
 
 
+cur_path = os.path.abspath(__file__)
+nnunet_path = cur_path
+for _ in range(3):
+    nnunet_path = os.path.dirname(nnunet_path)
+hard_hgg_file = os.path.join(nnunet_path, 'brats2021', 'hard_hgg_sample.txt')
+keys_list_hard_hgg = []
+with open(hard_hgg_file, 'r') as f:
+    lines = f.readlines()
+    for line in lines:
+        if not line:
+            continue
+        keys_list_hard_hgg.append(line[:15])
+
+
 def get_case_identifiers(folder):
     case_identifiers = [i[:-4] for i in os.listdir(folder) if i.endswith("npz") and (i.find("segFromPrevStage") == -1)]
     return case_identifiers
@@ -189,6 +203,7 @@ class DataLoader3D(SlimDataLoaderBase):
         self.has_prev_stage = has_prev_stage
         self.patch_size = patch_size
         self.list_of_keys = list(self._data.keys())
+        self.update_hgg_hard()
         # need_to_pad denotes by how much we need to pad the data so that if we sample a patch of size final_patch_size
         # (which is what the network will get) these patches will also cover the border of the patients
         self.need_to_pad = (np.array(patch_size) - np.array(final_patch_size)).astype(int)
@@ -219,6 +234,20 @@ class DataLoader3D(SlimDataLoaderBase):
         data_shape = (self.batch_size, num_color_channels, *self.patch_size)
         seg_shape = (self.batch_size, num_seg, *self.patch_size)
         return data_shape, seg_shape
+
+    def update_hgg_hard(self):
+        if len(self.list_of_keys) < 500:
+            return
+        print("old", len(self.list_of_keys))
+        list_new = []
+        for i in self.list_of_keys:
+            if i in keys_list_hard_hgg:
+                for _ in range(10):
+                    list_new.append(i)
+            else:
+                list_new.append(i)
+        self.list_of_keys = list_new
+        print("new", len(self.list_of_keys))
 
     def generate_train_batch(self):
         selected_keys = np.random.choice(self.list_of_keys, self.batch_size, True, None)
