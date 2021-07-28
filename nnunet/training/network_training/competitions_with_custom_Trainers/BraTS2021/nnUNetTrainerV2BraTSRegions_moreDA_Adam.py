@@ -16,7 +16,7 @@
 import torch
 
 from nnunet.evaluation.region_based_evaluation import get_brats_regions
-from nnunet.training.loss_functions.dice_loss import DC_and_BCE_loss
+from nnunet.training.loss_functions.dice_loss import DC_and_CE_loss
 from nnunet.training.network_training.nnUNetTrainerV2 import nnUNetTrainerV2
 from nnunet.training.network_training.competitions_with_custom_Trainers.BraTS2020.nnUNetTrainerV2BraTSRegions_moreDA import \
     nnUNetTrainerV2BraTSRegions_DA3_BN_BD, nnUNetTrainerV2BraTSRegions_DA4_BN, nnUNetTrainerV2BraTSRegions_DA4_BN_BD, \
@@ -40,6 +40,19 @@ class nnUNetTrainerV2BraTS_Adam(nnUNetTrainerV2):
         assert self.network is not None, "self.initialize_network must be called first"
         self.optimizer = torch.optim.AdamW(self.network.parameters(), self.initial_lr)
         self.lr_scheduler = None
+
+
+class nnUNetTrainerV2BraTS_BD_Adam_320(nnUNetTrainerV2BraTS_Adam):
+    """
+    Info for Fabian: same as internal nnUNetTrainerV2_2
+    """
+
+    def __init__(self, plans_file, fold, output_folder=None, dataset_directory=None, batch_dice=True, stage=None,
+                 unpack_data=True, deterministic=True, fp16=False):
+        super().__init__(plans_file, fold, output_folder, dataset_directory, batch_dice, stage, unpack_data,
+                         deterministic, fp16)
+        self.max_num_epochs = 320  # anning 2021-07-13 from 1000 to 160 40000 iterations
+        self.loss = DC_and_CE_loss({'batch_dice': True, 'smooth': 1e-5, 'do_bg': False}, {})
 
 
 class nnUNetTrainerV2BraTSRegions_DA3_BN_Adam(nnUNetTrainerV2BraTSRegions_DA3_BN):
