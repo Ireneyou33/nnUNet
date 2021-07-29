@@ -76,11 +76,13 @@ class nnUNetHRNetOCRTrainerV2BraTS_Adam(nnUNetTrainerV2):
         """
         if self.threeD:
             config = update_config(config_default, CONFIG_3D)
-            self.network = HighResolutionNet3D(config=config)
+            self.network = HighResolutionNet3D(config=config, num_input_channels=self.num_input_channels,
+                                               num_classes=self.num_classes)
 
         else:
             config = update_config(config_default, CONFIG_2D)
-            self.network = HighResolutionNet(config=config)
+            self.network = HighResolutionNet(config=config, num_input_channels=self.num_input_channels,
+                                             num_classes=self.num_classes)
         if torch.cuda.is_available():
             self.network.cuda()
         self.network.inference_apply_nonlin = softmax_helper
@@ -100,8 +102,14 @@ class nnUNetHRNetOCRTrainerV2BraTS_Adam(nnUNetTrainerV2):
 
             if force_load_plans or (self.plans is None):
                 self.load_plans_file()
-            self.plans['plans_per_stage'][0]['patch_size'] = [64, 64, 64]
-            self.plans['plans_per_stage'][0]['batch_size'] = 1
+
+            if self.threeD:
+                self.plans['plans_per_stage'][0]['patch_size'] = [64, 64, 64]
+                self.plans['plans_per_stage'][0]['batch_size'] = 1
+            else:
+                self.plans['plans_per_stage'][0]['batch_size'] = 7
+            print(self.plans['plans_per_stage'][0]['batch_size'])
+
             self.process_plans(self.plans)
 
             self.setup_DA_params()
@@ -192,7 +200,6 @@ class nnUNetHRNetOCRTrainerV2BraTS_Adam(nnUNetTrainerV2):
             with autocast():
                 output = self.network(data)
                 del data
-                print("output.shape, target.shape: ", output.shape, target.shape)
                 l = self.loss(output, target)
 
             if do_backprop:
@@ -217,6 +224,18 @@ class nnUNetHRNetOCRTrainerV2BraTS_Adam(nnUNetTrainerV2):
         del target
 
         return l.detach().cpu().numpy()
+
+
+class nnUNetHRNetOCRTrainerV2BraTS_Adam_500(nnUNetHRNetOCRTrainerV2BraTS_Adam):
+    """
+    Info for Fabian: same as internal nnUNetTrainerV2_2
+    """
+
+    def __init__(self, plans_file, fold, output_folder=None, dataset_directory=None, batch_dice=True, stage=None,
+                 unpack_data=True, deterministic=True, fp16=False):
+        super().__init__(plans_file, fold, output_folder, dataset_directory, batch_dice, stage, unpack_data,
+                         deterministic, fp16)
+        self.max_num_epochs = 500  # anning 2021-07-13 from 1000 to 160 40000 iterations
 
 
 class nnUNetHRNetOCRTrainerV2BraTSRegions_DA3_BN_BD_Adam(nnUNetTrainerV2BraTSRegions_DA3_BN_BD):

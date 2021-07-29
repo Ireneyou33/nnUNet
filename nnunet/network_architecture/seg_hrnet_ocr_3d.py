@@ -426,13 +426,6 @@ class HighResolutionModule(nn.Module):
                 if i == j:
                     y = y + x[j]
                 elif j > i:
-                    # TODO 插值改为3D
-                    # width_output = x[i].shape[-1]
-                    # height_output = x[i].shape[-2]
-                    # y = y + F.interpolate(
-                    #     self.fuse_layers[i][j](x[j]),
-                    #     size=[height_output, width_output],
-                    #     mode='bilinear', align_corners=ALIGN_CORNERS)
                     width_output = x[i].shape[-1]
                     height_output = x[i].shape[-2]
                     depht_output = x[i].shape[-3]
@@ -462,9 +455,9 @@ class HighResolutionNet3D(SegmentationNetwork):
         ALIGN_CORNERS = config.MODEL.ALIGN_CORNERS
 
         # this two args is for nnUNet
-        self._deep_supervision = None
-        self.do_ds = False
-        self.in_channel = 4
+        self._deep_supervision = kwargs.get("deep_supervision", True)
+        self.do_ds = self._deep_supervision
+        self.in_channel = kwargs.get("num_input_channels")
 
         # stem net
         self.conv1 = nn.Conv3d(self.in_channel, 64, kernel_size=3, stride=1, padding=1, bias=False)
@@ -664,18 +657,6 @@ class HighResolutionNet3D(SegmentationNetwork):
                 x_list.append(y_list[i])
         x = self.stage4(x_list)
 
-        # # Upsampling
-        # x0_h, x0_w = x[0].size(2), x[0].size(3)
-        # x1 = F.interpolate(x[1], size=(x0_h, x0_w),
-        #                    mode='bilinear', align_corners=ALIGN_CORNERS)
-        # x2 = F.interpolate(x[2], size=(x0_h, x0_w),
-        #                    mode='bilinear', align_corners=ALIGN_CORNERS)
-        # x3 = F.interpolate(x[3], size=(x0_h, x0_w),
-        #                    mode='bilinear', align_corners=ALIGN_CORNERS)
-        #
-        # feats = torch.cat([x[0], x1, x2, x3], 1)
-
-        # Upsampling  # TODO 插值改为3D插值
         x0d, x0_h, x0_w = x[0].size(2), x[0].size(3), x[0].size(4)
         print(x[0].size(2), x[0].size(3), x[0].size(4))
         print(x[1].size(2), x[1].size(3), x[1].size(4))
@@ -708,12 +689,13 @@ class HighResolutionNet3D(SegmentationNetwork):
         out = self.cls_head(feats)
         print(f"out : {out.shape}")
 
-        # out_aux_seg.append(out_aux)
-        # out_aux_seg.append(out)
-        #
-        # return out_aux_seg
+        # TODO 增加辅助损失
+        out_aux_seg.append(out_aux)
+        out_aux_seg.append(out)
 
-        return out
+        return out_aux_seg
+        #
+        # return out
 
     def init_weights(self, pretrained='',):
         logger.info('=> init weights from normal distribution')
