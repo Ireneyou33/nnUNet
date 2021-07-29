@@ -17,6 +17,7 @@ import numpy as np
 import torch
 from torch import nn
 from nnunet.training.data_augmentation.data_augmentation_moreDA import get_moreDA_augmentation
+from nnunet.training.loss_functions.deep_supervision import MultipleOutputLoss2
 from nnunet.network_architecture.neural_network import SegmentationNetwork
 from nnunet.utilities.nd_softmax import softmax_helper
 from nnunet.evaluation.region_based_evaluation import get_brats_regions
@@ -29,7 +30,8 @@ from batchgenerators.utilities.file_and_folder_operations import *
 from nnunet.training.network_training.competitions_with_custom_Trainers.BraTS2020.nnUNetTrainerV2BraTSRegions_moreDA import \
     nnUNetTrainerV2BraTSRegions_DA3_BN_BD, nnUNetTrainerV2BraTSRegions_DA4_BN, nnUNetTrainerV2BraTSRegions_DA4_BN_BD
 from nnunet.training.dataloading.dataset_loading import unpack_dataset
-from nnunet.network_architecture.seg_hrnet_ocr_3d import HighResolutionNet
+from nnunet.network_architecture.seg_hrnet_ocr_3d import HighResolutionNet3D
+from nnunet.network_architecture.seg_hrnet_ocr import HighResolutionNet
 from nnunet.network_architecture.seg_hrnet_ocr_config_default import _C as config_default
 
 nnunet_path = os.path.dirname(os.path.abspath(__file__))
@@ -37,7 +39,8 @@ for i in range(4):
     nnunet_path = os.path.dirname(nnunet_path)
 print(f"nnunet_path: {nnunet_path}")
 
-CONFIG = os.path.join(nnunet_path, "brats2021", "seg_hrnet_ocr_w18_128_128_128.yaml")
+CONFIG_3D = os.path.join(nnunet_path, "brats2021", "seg_hrnet_ocr_3d_w18_128_128_128.yaml")
+CONFIG_2D = os.path.join(nnunet_path, "brats2021", "seg_hrnet_ocr_w48_128_128_128.yaml")
 
 
 def update_config(cfg, config_file):
@@ -71,12 +74,16 @@ class nnUNetHRNetOCRTrainerV2BraTS_Adam(nnUNetTrainerV2):
         """
         :return:
         """
-        config = update_config(config_default, CONFIG)
-        self.network = HighResolutionNet(config=config)
+        if self.threeD:
+            config = update_config(config_default, CONFIG_3D)
+            self.network = HighResolutionNet3D(config=config)
+
+        else:
+            config = update_config(config_default, CONFIG_2D)
+            self.network = HighResolutionNet(config=config)
         if torch.cuda.is_available():
             self.network.cuda()
         self.network.inference_apply_nonlin = softmax_helper
-
 
     def initialize(self, training=True, force_load_plans=False):
         """
@@ -98,24 +105,29 @@ class nnUNetHRNetOCRTrainerV2BraTS_Adam(nnUNetTrainerV2):
             self.process_plans(self.plans)
 
             self.setup_DA_params()
-            self.deep_supervision_scales = None
 
-            ################# Here we wrap the loss for deep supervision ############
-            # we need to know the number of outputs of the network
-            net_numpool = len(self.net_num_pool_op_kernel_sizes)
+            # ################ Here we wrap the loss for deep supervision ############
+            self.deep_supervision_scales = [[1, 1, 1]] * 2
 
-            # we give each output a weight which decreases exponentially (division by 2) as the resolution decreases
-            # this gives higher resolution outputs more weight in the loss
-            weights = np.array([1 / (2 ** i) for i in range(net_numpool)])
+            # # we need to know the number of outputs of the network
+            # net_numpool = len(self.net_num_pool_op_kernel_sizes)
+            #
+            # # we give each output a weight which decreases exponentially (division by 2) as the resolution decreases
+            # # this gives higher resolution outputs more weight in the loss
+            # weights = np.array([1 / (2 ** i) for i in range(net_numpool)])
+            #
+            # # we don't use the lowest 2 outputs. Normalize weights so that they sum to 1
+            # mask = np.array([True] + [True if i < net_numpool - 1 else False for i in range(1, net_numpool)])
+            # weights[~mask] = 0
+            # weights = weights / weights.sum()
+            # self.ds_loss_weights = weights
 
-            # we don't use the lowest 2 outputs. Normalize weights so that they sum to 1
-            mask = np.array([True] + [True if i < net_numpool - 1 else False for i in range(1, net_numpool)])
-            weights[~mask] = 0
-            weights = weights / weights.sum()
-            self.ds_loss_weights = weights
+            # in HRNetOCR, We set the two weights [0.4, 1]
+            self.ds_loss_weights = np.array([0.4, 1])
             # now wrap the loss
-            self.loss = DC_and_CE_loss({'batch_dice': self.batch_dice, 'smooth': 1e-5, 'do_bg': False}, {})
-            ################# END ###################
+            # self.loss = DC_and_CE_loss({'batch_dice': self.batch_dice, 'smooth': 1e-5, 'do_bg': False}, {})
+            self.loss = MultipleOutputLoss2(self.loss, self.ds_loss_weights)
+            # ################ END ###################
 
             self.folder_with_preprocessed_data = join(self.dataset_directory, self.plans['data_identifier'] +
                                                       "_stage%d" % self.stage)

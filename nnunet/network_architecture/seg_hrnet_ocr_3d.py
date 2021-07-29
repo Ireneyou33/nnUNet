@@ -453,12 +453,12 @@ blocks_dict = {
 }
 
 
-class HighResolutionNet(SegmentationNetwork):
+class HighResolutionNet3D(SegmentationNetwork):
 
     def __init__(self, config, **kwargs):
         global ALIGN_CORNERS
         extra = config.MODEL.EXTRA
-        super(HighResolutionNet, self).__init__()
+        super(HighResolutionNet3D, self).__init__()
         ALIGN_CORNERS = config.MODEL.ALIGN_CORNERS
 
         # this two args is for nnUNet
@@ -742,7 +742,7 @@ class HighResolutionNet(SegmentationNetwork):
 
 
 def get_seg_model(cfg, **kwargs):
-    model = HighResolutionNet(cfg, **kwargs)
+    model = HighResolutionNet3D(cfg, **kwargs)
     model.init_weights(cfg.MODEL.PRETRAINED)
 
     return model

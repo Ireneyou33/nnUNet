@@ -13,7 +13,7 @@ DATASET:
   ROOT: 'data/'
   TEST_SET: 'list/cocostuff/val.lst'
   TRAIN_SET: 'list/cocostuff/train.lst'
-  NUM_CLASSES: 171
+  NUM_CLASSES: 4
 MODEL:
   NAME: seg_hrnet_ocr
   NUM_OUTPUTS: 2
