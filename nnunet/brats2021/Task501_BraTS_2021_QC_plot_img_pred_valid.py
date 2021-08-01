@@ -14,13 +14,17 @@
 import argparse
 import numpy as np
 import pandas as pd
+import SimpleITK as sitk
+import cv2
+
 
 from batchgenerators.utilities.file_and_folder_operations import *
 
 from nnunet.paths import nnUNet_raw_data
 from nnunet.brats2021.misc import plot_voxel_enhance_brats
-import SimpleITK as sitk
-import cv2
+from nnunet.brats2021.path import nnunet_path
+
+current_path = os.path.join(nnunet_path, "brats2021")
 
 
 if __name__ == "__main__":
@@ -42,7 +46,7 @@ if __name__ == "__main__":
     downloaded_data_dir_val = "/mnt/ngshare/PersonData/anning/Dataset/RawData/MICCAI_BraTS2021_ValidationData"
 
     evaluate_file = os.path.join(data_dir_pred, "results.csv")  # 预测结果的评价指标文件
-    grading_file = '/home/anning/project/TTbraTS/nnUNet/nnunet/brats2021/grading_res.csv'  # HGG_LGG结果文件
+    grading_file = os.path.join(current_path, "grading_res.csv")  # HGG_LGG结果文件
 
     print(f'data_dir_pred : {data_dir_pred}')
     # print(f'data_dir_gt   : {data_dir_gt}')

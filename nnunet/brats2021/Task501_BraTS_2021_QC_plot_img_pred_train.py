@@ -14,13 +14,16 @@
 import argparse
 import numpy as np
 import pandas as pd
+import SimpleITK as sitk
+import cv2
 
 from batchgenerators.utilities.file_and_folder_operations import *
 
 from nnunet.paths import nnUNet_raw_data
 from nnunet.brats2021.misc import plot_voxel_enhance_brats
-import SimpleITK as sitk
-import cv2
+from nnunet.brats2021.path import nnunet_path
+
+current_path = os.path.join(nnunet_path, "brats2021")
 
 
 if __name__ == "__main__":
@@ -41,14 +44,14 @@ if __name__ == "__main__":
     img_dir = args.img_out_folder
 
     task_name = "Task501_BraTS2021"
-    downloaded_data_dir = "/home/anning/Dataset/RawData/MICCAI_BraTS2021_TrainingData"
+    downloaded_data_dir = "/mnt/ngshare/PersonData/anning/Dataset/RawData/MICCAI_BraTS2021_TrainingData"
 
     # data_dir_pred = "/home/anning/Dataset/ProjData/nnunet/RESULTS_FOLDER/nnUNet/3d_fullres/Task501_BraTS2021/nnUNetPlusPlusTrainerV2BraTS_Adam__nnUNetPlansv2.1/fold_0/validation_raw_best"
     # data_dir_gt = "/home/anning/Dataset/ProjData/nnunet/nnUNet_raw_data_base/nnUNet_raw_data/Task501_BraTS2021/labelsTr"
     # img_dir = os.path.join(os.path.dirname(data_dir_pred), "QC_IMG_EVAL_ALL")  # 输出图片的文件夹
 
     evaluate_file = os.path.join(data_dir_pred, "results.csv")  # 预测结果的评价指标文件
-    grading_file = '/home/anning/project/TTbraTS/nnUNet/nnunet/brats2021/grading_res.csv'  # HGG_LGG结果文件
+    grading_file = os.path.join(current_path, "grading_res.csv")  # HGG_LGG结果文件
 
     print(f'data_dir_pred : {data_dir_pred}')
     print(f'data_dir_gt   : {data_dir_gt}')
@@ -139,6 +142,11 @@ if __name__ == "__main__":
 
         # 绘制MRI的4种模态图
         for f, m_n in zip([t1, t1c, t2, flair], ["t1", "t1c", "t2", "flair"]):
+            print('patient name:', patient_name)
+            print('grading: ', grading)
+            print('m_n: ', m_n)
+            print('dc_mean:',  dc_mean)
+            print('hd95_mean: ', hd95_mean)
             out_img_origin = os.path.join(img_dir, f'{patient_name}_{grading}_a_{m_n}_{dc_mean:02.4f}_{hd95_mean:03.2f}.png')
             img = sitk.ReadImage(f)
             img_npy = sitk.GetArrayFromImage(img)[z_range[0]:z_range[1]]

@@ -16,7 +16,7 @@ if __name__ == "__main__":
     data_dir_gt = args.gt_folder
 
     if args.result_file is None:
-        result_file = os.path.join(data_dir_pred, "result.csv")
+        result_file = os.path.join(data_dir_pred, "results.csv")
     else:
         result_file = args.result_file
 

@@ -386,7 +386,7 @@ def load_evaluate(filename_gt: str, filename_pred: str):
     return evaluate_BraTS_case(arr_pred, arr_gt)
 
 
-def evaluate_BraTS_folder(folder_pred, folder_gt, num_processes: int = 24, strict=False):
+def evaluate_BraTS_folder(folder_pred, folder_gt, num_processes: int = 24, strict=False, out_file=None):
     nii_pred = subfiles(folder_pred, suffix='.nii.gz', join=False)
     if len(nii_pred) == 0:
         return
@@ -399,11 +399,14 @@ def evaluate_BraTS_folder(folder_pred, folder_gt, num_processes: int = 24, stric
     nii_gt_fullpath = [join(folder_gt, i) for i in nii_pred]
     results = p.starmap(load_evaluate, zip(nii_gt_fullpath, nii_pred_fullpath))
     # now write to output file
-    with open(join(folder_pred, 'results.csv'), 'w') as f:
+    if out_file is None:
+        out_file = join(folder_pred, 'results.csv')
+    with open(out_file, 'w') as f:
         f.write("name,dc_whole,dc_core,dc_enh,hd95_whole,hd95_core,hd95_enh\n")
         for fname, r in zip(nii_pred, results):
             f.write(fname)
             f.write(",%0.4f,%0.4f,%0.4f,%3.3f,%3.3f,%3.3f\n" % r)
+    print("All done!")
 
 
 def load_csv_for_ranking(csv_file: str):
