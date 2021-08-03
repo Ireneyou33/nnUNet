@@ -39,8 +39,8 @@ for i in range(4):
     nnunet_path = os.path.dirname(nnunet_path)
 print(f"nnunet_path: {nnunet_path}")
 
-CONFIG_3D = os.path.join(nnunet_path, "brats2021", "seg_hrnet_ocr_3d_w18_128_128_128.yaml")
-CONFIG_2D = os.path.join(nnunet_path, "brats2021", "seg_hrnet_ocr_w48_128_128_128.yaml")
+
+current_dir = os.path.dirname(os.path.abspath(__file__))
 
 
 def update_config(cfg, config_file):
@@ -52,7 +52,7 @@ def update_config(cfg, config_file):
     return cfg
 
 
-class nnUNetHRNetOCRTrainerV2BraTS_Adam(nnUNetTrainerV2):
+class nnUNetHRNetOCRTrainerV2BraTS_Adam_w48_320(nnUNetTrainerV2):
     """
     Info for Fabian: same as internal nnUNetTrainerV2_2
     """
@@ -61,9 +61,12 @@ class nnUNetHRNetOCRTrainerV2BraTS_Adam(nnUNetTrainerV2):
                  unpack_data=True, deterministic=True, fp16=False):
         super().__init__(plans_file, fold, output_folder, dataset_directory, batch_dice, stage, unpack_data,
                          deterministic, fp16)
-        self.patience = 30  # 如果 50 个轮次MA没有减低，停止训练
-        self.max_num_epochs = 160  # anning 2021-07-13 from 1000 to 160 40000 iterations
+        self.patience = 20  # 如果 50 个轮次MA没有减低，停止训练
+        self.max_num_epochs = 320  # anning 2021-07-13 from 1000 to 160 40000 iterations
         self.initial_lr = 1e-3  # anning 2021-07-13 from 1e-2 to 1e-3
+        self.config = os.path.join(current_dir, "seg_hrnet_ocr_w48_128_128_128.yaml")
+        self.config = update_config(config_default, self.config)
+        self.deep_supervision = True
 
     def initialize_optimizer_and_scheduler(self):
         assert self.network is not None, "self.initialize_network must be called first"
@@ -75,12 +78,18 @@ class nnUNetHRNetOCRTrainerV2BraTS_Adam(nnUNetTrainerV2):
         :return:
         """
         if self.threeD:
-            config = update_config(config_default, CONFIG_3D)
-            self.network = HighResolutionNet3D(config=config)
-
+            self.network = HighResolutionNet3D(config=self.config, num_input_channels=self.num_input_channels,
+                                               num_classes=self.num_classes, deep_supervision=self.deep_supervision)
+            self.network.conv_op = nn.Conv3d
+            self.network.dropout_op = nn.Dropout3d
+            self.network.norm_op = nn.InstanceNorm3d
         else:
-            config = update_config(config_default, CONFIG_2D)
-            self.network = HighResolutionNet(config=config)
+            self.network = HighResolutionNet(config=self.config,  num_input_channels=self.num_input_channels,
+                                             num_classes=self.num_classes, deep_supervision=self.deep_supervision)
+            self.network.conv_op = nn.Conv2d
+            self.network.dropout_op = nn.Dropout2d
+            self.network.norm_op = nn.InstanceNorm2d
+
         if torch.cuda.is_available():
             self.network.cuda()
         self.network.inference_apply_nonlin = softmax_helper
@@ -100,30 +109,16 @@ class nnUNetHRNetOCRTrainerV2BraTS_Adam(nnUNetTrainerV2):
 
             if force_load_plans or (self.plans is None):
                 self.load_plans_file()
-            self.plans['plans_per_stage'][0]['patch_size'] = [64, 64, 64]
-            self.plans['plans_per_stage'][0]['batch_size'] = 1
             self.process_plans(self.plans)
 
             self.setup_DA_params()
 
             # ################ Here we wrap the loss for deep supervision ############
+            self.deep_supervision = True
             self.deep_supervision_scales = [[1, 1, 1]] * 2
 
-            # # we need to know the number of outputs of the network
-            # net_numpool = len(self.net_num_pool_op_kernel_sizes)
-            #
-            # # we give each output a weight which decreases exponentially (division by 2) as the resolution decreases
-            # # this gives higher resolution outputs more weight in the loss
-            # weights = np.array([1 / (2 ** i) for i in range(net_numpool)])
-            #
-            # # we don't use the lowest 2 outputs. Normalize weights so that they sum to 1
-            # mask = np.array([True] + [True if i < net_numpool - 1 else False for i in range(1, net_numpool)])
-            # weights[~mask] = 0
-            # weights = weights / weights.sum()
-            # self.ds_loss_weights = weights
-
-            # in HRNetOCR, We set the two weights [0.4, 1]
-            self.ds_loss_weights = np.array([0.4, 1])
+            # in HRNetOCR, We set the two weights [1, 0.4]，最终输出的权重为1，粗分割的权重为0.4
+            self.ds_loss_weights = np.array([1, 0.4])
             # now wrap the loss
             # self.loss = DC_and_CE_loss({'batch_dice': self.batch_dice, 'smooth': 1e-5, 'do_bg': False}, {})
             self.loss = MultipleOutputLoss2(self.loss, self.ds_loss_weights)
@@ -192,13 +187,13 @@ class nnUNetHRNetOCRTrainerV2BraTS_Adam(nnUNetTrainerV2):
             with autocast():
                 output = self.network(data)
                 del data
-                print("output.shape, target.shape: ", output.shape, target.shape)
+                # print("output.shape, target.shape: ", output[0].shape, target[0].shape)
                 l = self.loss(output, target)
 
             if do_backprop:
                 self.amp_grad_scaler.scale(l).backward()
                 self.amp_grad_scaler.unscale_(self.optimizer)
-                torch.nn.utils.clip_grad_norm_(self.network.parameters(), 12)
+                torch.nn.utils.clip_grad_norm_(self.network.parameters(), 12, error_if_nonfinite=False)
                 self.amp_grad_scaler.step(self.optimizer)
                 self.amp_grad_scaler.update()
         else:
@@ -208,7 +203,7 @@ class nnUNetHRNetOCRTrainerV2BraTS_Adam(nnUNetTrainerV2):
 
             if do_backprop:
                 l.backward()
-                torch.nn.utils.clip_grad_norm_(self.network.parameters(), 12)
+                torch.nn.utils.clip_grad_norm_(self.network.parameters(), 12, error_if_nonfinite=False)
                 self.optimizer.step()
 
         if run_online_evaluation:

@@ -10,7 +10,6 @@ from __future__ import print_function
 
 import os
 import logging
-import functools
 
 import numpy as np
 
@@ -19,11 +18,13 @@ import torch.nn as nn
 import torch._utils
 import torch.nn.functional as F
 
+from nnunet.network_architecture.neural_network import SegmentationNetwork
 from .seg_hrnet_ocr_bn_helper import BatchNorm2d, BatchNorm2d_class, relu_inplace
 
 ALIGN_CORNERS = True
 BN_MOMENTUM = 0.1
 logger = logging.getLogger(__name__)
+
 
 class ModuleHelper:
 
@@ -414,7 +415,7 @@ blocks_dict = {
 }
 
 
-class HighResolutionNet(nn.Module):
+class HighResolutionNet(SegmentationNetwork):
 
     def __init__(self, config, **kwargs):
         global ALIGN_CORNERS
@@ -422,8 +423,14 @@ class HighResolutionNet(nn.Module):
         super(HighResolutionNet, self).__init__()
         ALIGN_CORNERS = config.MODEL.ALIGN_CORNERS
 
+        # these args is for nnUNet
+        self._deep_supervision = kwargs['deep_supervision']
+        self.do_ds = self._deep_supervision
+        self.num_input_channels = kwargs['num_input_channels']
+        self.num_classes = kwargs['num_classes']
+
         # stem net
-        self.conv1 = nn.Conv2d(3, 64, kernel_size=3, stride=2, padding=1,
+        self.conv1 = nn.Conv2d(self.num_input_channels, 64, kernel_size=3, stride=2, padding=1,
                                bias=False)
         self.bn1 = BatchNorm2d(64, momentum=BN_MOMENTUM)
         self.conv2 = nn.Conv2d(64, 64, kernel_size=3, stride=2, padding=1,
@@ -478,7 +485,7 @@ class HighResolutionNet(nn.Module):
             BatchNorm2d(ocr_mid_channels),
             nn.ReLU(inplace=relu_inplace),
         )
-        self.ocr_gather_head = SpatialGather_Module(config.DATASET.NUM_CLASSES)
+        self.ocr_gather_head = SpatialGather_Module(self.num_classes)
 
         self.ocr_distri_head = SpatialOCR_Module(in_channels=ocr_mid_channels,
                                                  key_channels=ocr_key_channels,
@@ -487,14 +494,14 @@ class HighResolutionNet(nn.Module):
                                                  dropout=0.05,
                                                  )
         self.cls_head = nn.Conv2d(
-            ocr_mid_channels, config.DATASET.NUM_CLASSES, kernel_size=1, stride=1, padding=0, bias=True)
+            ocr_mid_channels, self.num_classes, kernel_size=1, stride=1, padding=0, bias=True)
 
         self.aux_head = nn.Sequential(
             nn.Conv2d(last_inp_channels, last_inp_channels,
                       kernel_size=1, stride=1, padding=0),
             BatchNorm2d(last_inp_channels),
             nn.ReLU(inplace=relu_inplace),
-            nn.Conv2d(last_inp_channels, config.DATASET.NUM_CLASSES,
+            nn.Conv2d(last_inp_channels, self.num_classes,
                       kernel_size=1, stride=1, padding=0, bias=True)
         )
         
@@ -642,10 +649,13 @@ class HighResolutionNet(nn.Module):
 
         out = self.cls_head(feats)
 
-        out_aux_seg.append(out_aux)
         out_aux_seg.append(out)
+        out_aux_seg.append(out_aux)
 
-        return out_aux_seg
+        if self._deep_supervision and self.do_ds:
+            return out_aux_seg
+        else:
+            return out_aux_seg[0]
 
     def init_weights(self, pretrained='',):
         logger.info('=> init weights from normal distribution')
