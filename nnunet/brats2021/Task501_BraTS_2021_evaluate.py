@@ -1,21 +1,29 @@
 import os.path
 
 from nnunet.dataset_conversion.Task501_BraTS_2021 import evaluate_BraTS_folder
-
-
-# def plot_evaluate
+import argparse
 
 
 if __name__ == "__main__":
-    data_dir_pred = "/home/anning/Dataset/ProjData/nnunet/RESULTS_FOLDER/nnUNet/3d_fullres/Task501_BraTS2021/nnUNetPlusPlusTrainerV2BraTS_Adam__nnUNetPlansv2.1/fold_0/validation_raw_best"
-    data_dir_gt = "/home/anning/Dataset/ProjData/nnunet/nnUNet_raw_data_base/nnUNet_raw_data/Task501_BraTS2021/labelsTr"
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-p", '--pred-folder', help="模型预测结果", required=True)
+    parser.add_argument('-g', "--gt-folder", help="真实结果", required=True)
+    parser.add_argument('-r', "--result-file", help="真实结果", required=False, default=None)
+
+    args = parser.parse_args()
+
+    data_dir_pred = args.pred_folder
+    data_dir_gt = args.gt_folder
+
+    if args.result_file is None:
+        result_file = os.path.join(data_dir_pred, "results.csv")
+    else:
+        result_file = args.result_file
 
     print(f'data_dir_pred : {data_dir_pred}')
     print(f'data_dir_gt   : {data_dir_gt}')
-    # 计算评价指标的结果文件
-    result_file = os.path.join(data_dir_pred, "result.csv")
-    if not os.path.isfile(result_file):
-        evaluate_BraTS_folder(data_dir_pred, data_dir_gt, num_processes=6)
+    print(f'result-file   : {result_file}')
 
-    # 根据评价指标的结果文件绘制图像
-    # plot_evaluate(result_file, out_dir)
+    # 计算评价指标的结果文件
+    if not os.path.isfile(result_file):
+        evaluate_BraTS_folder(data_dir_pred, data_dir_gt, num_processes=6, out_file=result_file)

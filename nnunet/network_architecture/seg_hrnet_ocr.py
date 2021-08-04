@@ -19,11 +19,14 @@ import torch._utils
 import torch.nn.functional as F
 
 from nnunet.network_architecture.neural_network import SegmentationNetwork
-from .seg_hrnet_ocr_bn_helper import BatchNorm2d, BatchNorm2d_class, relu_inplace
 
 ALIGN_CORNERS = True
 BN_MOMENTUM = 0.1
 logger = logging.getLogger(__name__)
+
+
+BatchNorm2d_class = BatchNorm2d = torch.nn.BatchNorm2d
+relu_inplace = True
 
 
 class ModuleHelper:
