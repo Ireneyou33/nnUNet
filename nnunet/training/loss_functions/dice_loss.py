@@ -478,7 +478,7 @@ class FocalTverskyLoss(nn.Module):
         self.gamma = 0.75
 
     def forward(self, x, y, loss_mask=None):
-        dc_loss = self.dc(x, y)
+        dc_loss = self.dc(x, y, loss_mask=loss_mask)
         ft_loss = dc_loss.pow(self.gamma)
         return ft_loss
 
@@ -490,7 +490,7 @@ class Tversky_and_CE_Loss(DC_and_CE_loss):
                                                   square_dice=square_dice,
                                                   weight_ce=weight_ce, weight_dice=weight_dice,
                                                   log_dice=log_dice, ignore_label=ignore_label)
-        self.dc = TverskyLoss(apply_nonlin=softmax_helper)
+        self.dc = TverskyLoss(apply_nonlin=softmax_helper, **soft_dice_kwargs)
 
 
 class FocalTversky_and_CE_Loss(DC_and_CE_loss):
@@ -500,4 +500,4 @@ class FocalTversky_and_CE_Loss(DC_and_CE_loss):
                                                        square_dice=square_dice,
                                                        weight_ce=weight_ce, weight_dice=weight_dice,
                                                        log_dice=log_dice, ignore_label=ignore_label)
-        self.dc = FocalTverskyLoss(apply_nonlin=softmax_helper)
+        self.dc = FocalTverskyLoss(apply_nonlin=softmax_helper, **soft_dice_kwargs)
