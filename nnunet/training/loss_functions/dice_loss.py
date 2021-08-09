@@ -69,7 +69,7 @@ class GDL(nn.Module):
         tp, fp, fn, _ = get_tp_fp_fn_tn(x, y_onehot, axes, loss_mask, self.square)
 
         # GDL weight computation, we use 1/V
-        volumes = sum_tensor(y_onehot, axes) + 1e-6 # add some eps to prevent div by zero
+        volumes = sum_tensor(y_onehot, axes) + 1e-6  # add some eps to prevent div by zero
 
         if self.square_volumes:
             volumes = volumes ** 2
@@ -357,7 +357,7 @@ class DC_and_CE_loss(nn.Module):
         if self.aggregate == "sum":
             result = self.weight_ce * ce_loss + self.weight_dice * dc_loss
         else:
-            raise NotImplementedError("nah son") # reserved for other stuff (later)
+            raise NotImplementedError("nah son")  # reserved for other stuff (later)
         return result
 
 
@@ -384,7 +384,7 @@ class DC_and_BCE_loss(nn.Module):
         if self.aggregate == "sum":
             result = ce_loss + dc_loss
         else:
-            raise NotImplementedError("nah son") # reserved for other stuff (later)
+            raise NotImplementedError("nah son")  # reserved for other stuff (later)
 
         return result
 
@@ -402,7 +402,7 @@ class GDL_and_CE_loss(nn.Module):
         if self.aggregate == "sum":
             result = ce_loss + dc_loss
         else:
-            raise NotImplementedError("nah son") # reserved for other stuff (later)
+            raise NotImplementedError("nah son")  # reserved for other stuff (later)
         return result
 
 
@@ -422,5 +422,82 @@ class DC_and_topk_loss(nn.Module):
         if self.aggregate == "sum":
             result = ce_loss + dc_loss
         else:
-            raise NotImplementedError("nah son") # reserved for other stuff (later?)
+            raise NotImplementedError("nah son")  # reserved for other stuff (later?)
         return result
+
+
+class TverskyLoss(nn.Module):
+    def __init__(self, apply_nonlin=None, batch_dice=False, do_bg=True, smooth=1.):
+        """
+        """
+        super(TverskyLoss, self).__init__()
+
+        self.do_bg = do_bg
+        self.batch_dice = batch_dice
+        self.apply_nonlin = apply_nonlin
+        self.smooth = smooth
+        self.alpha = 0.7
+
+    def forward(self, x, y, loss_mask=None):
+        shp_x = x.shape
+
+        if self.batch_dice:
+            axes = [0] + list(range(2, len(shp_x)))
+        else:
+            axes = list(range(2, len(shp_x)))
+
+        if self.apply_nonlin is not None:
+            x = self.apply_nonlin(x)
+
+        tp, fp, fn, _ = get_tp_fp_fn_tn(x, y, axes, loss_mask, False)
+
+        nominator = 2 * tp + self.smooth
+        denominator = 2 * tp + (1 - self.alpha) * fp + self.alpha * fn + self.smooth
+
+        dc = nominator / (denominator + 1e-8)
+
+        if not self.do_bg:
+            if self.batch_dice:
+                dc = dc[1:]
+            else:
+                dc = dc[:, 1:]
+        dc = dc.mean()
+
+        return -dc
+
+
+class FocalTverskyLoss(nn.Module):
+    def __init__(self, apply_nonlin=None, batch_dice=False, do_bg=True, smooth=1.):
+        """
+        DO NOT APPLY NONLINEARITY IN YOUR NETWORK!
+
+        THIS LOSS IS INTENDED TO BE USED FOR BRATS REGIONS ONLY
+        """
+        super(FocalTverskyLoss, self).__init__()
+        self.dc = TverskyLoss(apply_nonlin=apply_nonlin, batch_dice=batch_dice, do_bg=do_bg, smooth=smooth)
+        self.gamma = 0.75
+
+    def forward(self, x, y, loss_mask=None):
+        dc_loss = self.dc(x, y, loss_mask=loss_mask)
+        ft_loss = dc_loss.pow(self.gamma)
+        return ft_loss
+
+
+class Tversky_and_CE_Loss(DC_and_CE_loss):
+    def __init__(self, soft_dice_kwargs, ce_kwargs, aggregate="sum", square_dice=False, weight_ce=1, weight_dice=1,
+                 log_dice=False, ignore_label=None):
+        super(Tversky_and_CE_Loss, self).__init__(soft_dice_kwargs, ce_kwargs, aggregate=aggregate,
+                                                  square_dice=square_dice,
+                                                  weight_ce=weight_ce, weight_dice=weight_dice,
+                                                  log_dice=log_dice, ignore_label=ignore_label)
+        self.dc = TverskyLoss(apply_nonlin=softmax_helper, **soft_dice_kwargs)
+
+
+class FocalTversky_and_CE_Loss(DC_and_CE_loss):
+    def __init__(self, soft_dice_kwargs, ce_kwargs, aggregate="sum", square_dice=False, weight_ce=1, weight_dice=1,
+                 log_dice=False, ignore_label=None):
+        super(FocalTversky_and_CE_Loss, self).__init__(soft_dice_kwargs, ce_kwargs, aggregate=aggregate,
+                                                       square_dice=square_dice,
+                                                       weight_ce=weight_ce, weight_dice=weight_dice,
+                                                       log_dice=log_dice, ignore_label=ignore_label)
+        self.dc = FocalTverskyLoss(apply_nonlin=softmax_helper, **soft_dice_kwargs)

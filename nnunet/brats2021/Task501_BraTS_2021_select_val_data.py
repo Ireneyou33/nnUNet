@@ -14,6 +14,8 @@
 
 from batchgenerators.utilities.file_and_folder_operations import *
 from nnunet.dataset_conversion.Task043_BraTS_2019 import copy_BraTS_segmentation_and_convert_labels
+import shutil
+
 
 if __name__ == "__main__":
     """
@@ -24,7 +26,7 @@ if __name__ == "__main__":
     # downloaded_data_dir_val = "/home/fabian/Downloads/MICCAI_BraTS2021_ValidationData"
     downloaded_data_dir_val = None
     split_final_file = "/home/anning/Dataset/ProjData/nnunet/nnUNet_preprocessed/Task501_BraTS2021/splits_final.pkl"
-    result_dir = "/home/anning/Dataset/ProjData/nnunet/RESULTS_FOLDER/nnUNet/3d_fullres/Task501_BraTS2021/nnUNetTrainerV2__nnUNetPlansv2.1/fold_0/"
+    result_dir = "/home/anning/Dataset/ProjData/nnunet/nnUNet_raw_data_base/nnUNet_raw_data/Task501_BraTS2021/imageTr_val_0"
 
     flod = 0
     with open(split_final_file, 'rb') as f:
@@ -32,12 +34,13 @@ if __name__ == "__main__":
 
     val_ids = split_data[flod]['val']
 
-    train_images_val = join(result_dir, f'images_val_{flod}')
-    train_label_pred = join(result_dir, f'label_pred_{flod}')
-    train_label_val = join(result_dir, f'label_val_{flod}')
+    train_images_val = result_dir
+    # train_images_val = join(result_dir, f'images_val_{flod}')
+    # train_label_pred = join(result_dir, f'label_pred_{flod}')
+    # train_label_val = join(result_dir, f'label_val_{flod}')
     maybe_mkdir_p(train_images_val)
-    maybe_mkdir_p(train_label_pred)
-    maybe_mkdir_p(train_label_val)
+    # maybe_mkdir_p(train_label_pred)
+    # maybe_mkdir_p(train_label_val)
 
     patient_names = []
     cur = join(downloaded_data_dir)
@@ -63,14 +66,12 @@ if __name__ == "__main__":
         ]), "%s" % patient_name
 
         if not os.path.isfile(join(train_images_val, patient_name + "_0000.nii.gz")):
-            os.symlink(t1, join(train_images_val, patient_name + "_0000.nii.gz"))
+            shutil.copy(t1, join(train_images_val, patient_name + "_0000.nii.gz"))
         if not os.path.isfile(join(train_images_val, patient_name + "_0001.nii.gz")):
-            os.symlink(t1c, join(train_images_val, patient_name + "_0001.nii.gz"))
+            shutil.copy(t1c, join(train_images_val, patient_name + "_0001.nii.gz"))
         if not os.path.isfile(join(train_images_val, patient_name + "_0002.nii.gz")):
-            os.symlink(t2, join(train_images_val, patient_name + "_0002.nii.gz"))
+            shutil.copy(t2, join(train_images_val, patient_name + "_0002.nii.gz"))
         if not os.path.isfile(join(train_images_val, patient_name + "_0003.nii.gz")):
-            os.symlink(flair, join(train_images_val, patient_name + "_0003.nii.gz"))
-        if not os.path.isfile(join(train_label_val, patient_name + ".nii.gz")):
-            copy_BraTS_segmentation_and_convert_labels(seg, join(train_label_val, patient_name + ".nii.gz"))
-
-    # nnUNet_predict -i /home/anning/Dataset/ProjData/nnunet/RESULTS_FOLDER/nnUNet/3d_fullres/Task501_BraTS2021/nnUNetTrainerV2__nnUNetPlansv2.1/fold_0/images_val_0 -o /home/anning/Dataset/ProjData/nnunet/RESULTS_FOLDER/nnUNet/3d_fullres/Task501_BraTS2021/nnUNetTrainerV2__nnUNetPlansv2.1/fold_0/label_pred_0 -t 0 -m 3d_fullres
+            shutil.copy(flair, join(train_images_val, patient_name + "_0003.nii.gz"))
+        # if not os.path.isfile(join(train_label_val, patient_name + ".nii.gz")):
+        #     copy_BraTS_segmentation_and_convert_labels(seg, join(train_label_val, patient_name + ".nii.gz"))

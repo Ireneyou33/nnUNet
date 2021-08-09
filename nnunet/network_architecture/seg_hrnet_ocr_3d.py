@@ -59,20 +59,14 @@ class SpatialGather_Module(nn.Module):
         self.cls_num = cls_num
         self.scale = scale
 
-    def forward(self, feats, probs):  # TODO 改为3D
-        # batch_size, c, h, w = probs.size(0), probs.size(1), probs.size(2), probs.size(3)
-        # probs = probs.view(batch_size, c, -1)
-        # feats = feats.view(batch_size, feats.size(1), -1)
-        # feats = feats.permute(0, 2, 1)  # batch x hw x c
-        # probs = F.softmax(self.scale * probs, dim=2)  # batch x k x hw
-        # ocr_context = torch.matmul(probs, feats).permute(0, 2, 1).unsqueeze(3)  # batch x k x c
+    def forward(self, feats, probs):
 
         batch_size, c, d, h, w = probs.size(0), probs.size(1), probs.size(2), probs.size(3), probs.size(4)
         probs = probs.view(batch_size, c, -1)  # batch x c x dhw
         feats = feats.view(batch_size, feats.size(1), -1)  # batch x c x dhw
         feats = feats.permute(0, 2, 1)  # batch x dhw x c
         probs = F.softmax(self.scale * probs, dim=2)  # batch x k x dhw
-        print("torch.matmul(probs, feats).permute(0, 2, 1).shape:", torch.matmul(probs, feats).permute(0, 2, 1).shape)
+        # print("torch.matmul(probs, feats).permute(0, 2, 1).shape:", torch.matmul(probs, feats).permute(0, 2, 1).shape)
         ocr_context = torch.matmul(probs, feats).permute(0, 2, 1).unsqueeze(3).unsqueeze(4)  # batch x k x c
         return ocr_context
 
@@ -128,35 +122,11 @@ class _ObjectAttentionBlock(nn.Module):
         )
 
     def forward(self, x, proxy):
-        # TODO 改为3D
-        # batch_size, h, w = x.size(0), x.size(2), x.size(3)
-        # if self.scale > 1:
-        #     x = self.pool(x)
-        #
-        # query = self.f_pixel(x).view(batch_size, self.key_channels, -1)
-        # query = query.permute(0, 2, 1)
-        # key = self.f_object(proxy).view(batch_size, self.key_channels, -1)
-        # value = self.f_down(proxy).view(batch_size, self.key_channels, -1)
-        # value = value.permute(0, 2, 1)
-        #
-        # sim_map = torch.matmul(query, key)
-        # sim_map = (self.key_channels**-.5) * sim_map
-        # sim_map = F.softmax(sim_map, dim=-1)
-        #
-        # # add bg context ...
-        # context = torch.matmul(sim_map, value)
-        # context = context.permute(0, 2, 1).contiguous()
-        # context = context.view(batch_size, self.key_channels, *x.size()[2:])
-        # context = self.f_up(context)
-        # if self.scale > 1:
-        #     context = F.interpolate(input=context, size=(h, w), mode='bilinear', align_corners=ALIGN_CORNERS)
 
         batch_size, d, h, w = x.size(0), x.size(2), x.size(3), x.size(4)
-        print(f"batch_size, d, h, w : ", batch_size, d, h, w)
         if self.scale > 1:
             x = self.pool(x)
 
-        print(f"batch_size, d, h, w : ", batch_size, d, h, w)
         query = self.f_pixel(x).view(batch_size, self.key_channels, -1)  # batch x c x dhw
         query = query.permute(0, 2, 1)  # batch x dhw x c
         key = self.f_object(proxy).view(batch_size, self.key_channels, -1)  # batch x c x dhw
@@ -454,15 +424,16 @@ class HighResolutionNet3D(SegmentationNetwork):
         super(HighResolutionNet3D, self).__init__()
         ALIGN_CORNERS = config.MODEL.ALIGN_CORNERS
 
-        # this two args is for nnUNet
-        self._deep_supervision = kwargs.get("deep_supervision", True)
+        # these args is for nnUNet
+        self._deep_supervision = kwargs['deep_supervision']
         self.do_ds = self._deep_supervision
-        self.in_channel = kwargs.get("num_input_channels")
+        self.num_input_channels = kwargs['num_input_channels']
+        self.num_classes = kwargs['num_classes']
 
         # stem net
-        self.conv1 = nn.Conv3d(self.in_channel, 64, kernel_size=3, stride=1, padding=1, bias=False)
+        self.conv1 = nn.Conv3d(self.num_input_channels, 64, kernel_size=3, stride=2, padding=1, bias=False)
         self.bn1 = nn.BatchNorm3d(64)
-        self.conv2 = nn.Conv3d(64, 64, kernel_size=3, stride=1, padding=1, bias=False)
+        self.conv2 = nn.Conv3d(64, 64, kernel_size=3, stride=2, padding=1, bias=False)
         self.bn2 = nn.BatchNorm3d(64)
         self.relu = nn.ReLU(inplace=relu_inplace)
 
@@ -513,7 +484,7 @@ class HighResolutionNet3D(SegmentationNetwork):
             nn.BatchNorm3d(ocr_mid_channels),
             nn.ReLU(inplace=relu_inplace),
         )
-        self.ocr_gather_head = SpatialGather_Module(config.DATASET.NUM_CLASSES)
+        self.ocr_gather_head = SpatialGather_Module(self.num_classes)
 
         self.ocr_distri_head = SpatialOCR_Module(in_channels=ocr_mid_channels,
                                                  key_channels=ocr_key_channels,
@@ -522,14 +493,14 @@ class HighResolutionNet3D(SegmentationNetwork):
                                                  dropout=0.05,
                                                  )
         self.cls_head = nn.Conv3d(
-            ocr_mid_channels, config.DATASET.NUM_CLASSES, kernel_size=1, stride=1, padding=0, bias=True)
+            ocr_mid_channels, self.num_classes, kernel_size=1, stride=1, padding=0, bias=True)
 
         self.aux_head = nn.Sequential(
             nn.Conv3d(last_inp_channels, last_inp_channels,
                       kernel_size=1, stride=1, padding=0),
             nn.BatchNorm3d(last_inp_channels),
             nn.ReLU(inplace=relu_inplace),
-            nn.Conv3d(last_inp_channels, config.DATASET.NUM_CLASSES,
+            nn.Conv3d(last_inp_channels, self.num_classes,
                       kernel_size=1, stride=1, padding=0, bias=True)
         )
         
@@ -615,17 +586,18 @@ class HighResolutionNet3D(SegmentationNetwork):
         return nn.Sequential(*modules), num_inchannels
 
     def forward(self, x):
-        print("x.shape : ", x.shape)
+        xd, xh, xw = x.size(2), x.size(3), x.size(4)
+        # print("x.shape : ", x.shape)
         x = self.conv1(x)
         x = self.bn1(x)
         x = self.relu(x)
-        print("conv1.x.shape : ", x.shape)
+        # print("conv1.x.shape : ", x.shape)
         x = self.conv2(x)
         x = self.bn2(x)
         x = self.relu(x)
-        print("conv2.x.shape : ", x.shape)
+        # print("conv2.x.shape : ", x.shape)
         x = self.layer1(x)
-        print("layer1.x.shape : ", x.shape)
+        # print("layer1.x.shape : ", x.shape)
 
         x_list = []
         for i in range(self.stage2_cfg['NUM_BRANCHES']):
@@ -657,45 +629,43 @@ class HighResolutionNet3D(SegmentationNetwork):
                 x_list.append(y_list[i])
         x = self.stage4(x_list)
 
+        # Upsampling
         x0d, x0_h, x0_w = x[0].size(2), x[0].size(3), x[0].size(4)
-        print(x[0].size(2), x[0].size(3), x[0].size(4))
-        print(x[1].size(2), x[1].size(3), x[1].size(4))
-        print(x[2].size(2), x[2].size(3), x[2].size(4))
-        print(x[3].size(2), x[3].size(3), x[3].size(4))
-        x1 = F.interpolate(x[1], size=(x0d, x0_h, x0_w),
-                           mode='trilinear', align_corners=ALIGN_CORNERS)
-        x2 = F.interpolate(x[2], size=(x0d, x0_h, x0_w),
-                           mode='trilinear', align_corners=ALIGN_CORNERS)
-        x3 = F.interpolate(x[3], size=(x0d, x0_h, x0_w),
-                           mode='trilinear', align_corners=ALIGN_CORNERS)
+        x1 = F.interpolate(x[1], size=(x0d, x0_h, x0_w), mode='trilinear', align_corners=ALIGN_CORNERS)
+        x2 = F.interpolate(x[2], size=(x0d, x0_h, x0_w), mode='trilinear', align_corners=ALIGN_CORNERS)
+        x3 = F.interpolate(x[3], size=(x0d, x0_h, x0_w), mode='trilinear', align_corners=ALIGN_CORNERS)
 
         feats = torch.cat([x[0], x1, x2, x3], 1)  # feats.shape = bcdhw
 
         out_aux_seg = []
-        print(f"feats : {feats.shape}")
+        # print(f"feats : {feats.shape}")
         # ocr
         out_aux = self.aux_head(feats)  # out_aux.shape = feats.shape = bcdhw
-        print(f"out_aux : {out_aux.shape}")
-        print(f"feats : {feats.shape}")
+        # print(f"out_aux : {out_aux.shape}")
         # compute contrast feature
         feats = self.conv3x3x3_ocr(feats)  # out_aux.shape = feats.shape = bcdhw
-        print(f"feats : {feats.shape}")
+        # print(f"feats : {feats.shape}")
 
         context = self.ocr_gather_head(feats, out_aux)
-        print(f"context : {context.shape}")
+        # print(f"context : {context.shape}")
         feats = self.ocr_distri_head(feats, context)
-        print(f"feats : {feats.shape}")
+        # print(f"feats : {feats.shape}")
 
         out = self.cls_head(feats)
-        print(f"out : {out.shape}")
+        # print(f"out : {out.shape}")
 
-        # TODO 增加辅助损失
-        out_aux_seg.append(out_aux)
+        # 恢复为原来的图像大小
+        out = F.interpolate(out, size=(xd, xh, xw), mode='trilinear', align_corners=ALIGN_CORNERS)
+        out_aux = F.interpolate(out_aux, size=(xd, xh, xw), mode='trilinear', align_corners=ALIGN_CORNERS)
+        # print(f"out : {out.shape}   out_aux : {out_aux.shape}")
+
         out_aux_seg.append(out)
+        out_aux_seg.append(out_aux)
 
-        return out_aux_seg
-        #
-        # return out
+        if self._deep_supervision and self.do_ds:
+            return out_aux_seg
+        else:
+            return out_aux_seg[0]
 
     def init_weights(self, pretrained='',):
         logger.info('=> init weights from normal distribution')

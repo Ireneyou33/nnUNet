@@ -20,11 +20,13 @@ import torch.nn.functional as F
 
 from nnunet.network_architecture.neural_network import SegmentationNetwork
 
-from .seg_hrnet_ocr_bn_helper import BatchNorm2d, BatchNorm2d_class, relu_inplace
-
 ALIGN_CORNERS = True
 BN_MOMENTUM = 0.1
 logger = logging.getLogger(__name__)
+
+
+BatchNorm2d_class = BatchNorm2d = torch.nn.BatchNorm2d
+relu_inplace = True
 
 
 class ModuleHelper:
@@ -424,17 +426,17 @@ class HighResolutionNet(SegmentationNetwork):
         super(HighResolutionNet, self).__init__()
         ALIGN_CORNERS = config.MODEL.ALIGN_CORNERS
 
-        # nnUNet
-        self._deep_supervision = kwargs.get("deep_supervision", True)
+        # these args is for nnUNet
+        self._deep_supervision = kwargs['deep_supervision']
         self.do_ds = self._deep_supervision
-        self.in_channel = kwargs.get("num_input_channels")
-        self.num_classes = kwargs.get("num_classes")
+        self.num_input_channels = kwargs['num_input_channels']
+        self.num_classes = kwargs['num_classes']
 
         # stem net
-        self.conv1 = nn.Conv2d(self.in_channel, 64, kernel_size=3, stride=1, padding=1,
+        self.conv1 = nn.Conv2d(self.num_input_channels, 64, kernel_size=3, stride=2, padding=1,
                                bias=False)
         self.bn1 = BatchNorm2d(64, momentum=BN_MOMENTUM)
-        self.conv2 = nn.Conv2d(64, 64, kernel_size=3, stride=1, padding=1,
+        self.conv2 = nn.Conv2d(64, 64, kernel_size=3, stride=2, padding=1,
                                bias=False)
         self.bn2 = BatchNorm2d(64, momentum=BN_MOMENTUM)
         self.relu = nn.ReLU(inplace=relu_inplace)
@@ -650,10 +652,13 @@ class HighResolutionNet(SegmentationNetwork):
 
         out = self.cls_head(feats)
 
-        out_aux_seg.append(out_aux)
         out_aux_seg.append(out)
+        out_aux_seg.append(out_aux)
 
-        return out_aux_seg
+        if self._deep_supervision and self.do_ds:
+            return out_aux_seg
+        else:
+            return out_aux_seg[0]
 
     def init_weights(self, pretrained='',):
         logger.info('=> init weights from normal distribution')
