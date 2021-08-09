@@ -73,7 +73,7 @@ class nnUNetTrainerV2BraTS_Adam_HARD_320(nnUNetTrainerV2):
         self.max_num_epochs = 320
 
 
-class nnUNetTrainerV2BraTS_Adam_320(nnUNetTrainerV2):
+class nnUNetTrainerV2BraTS_Adam_320(nnUNetTrainerV2BraTS_Adam_HARD_320):
     """
     Info for Fabian: same as internal nnUNetTrainerV2_2
     """
