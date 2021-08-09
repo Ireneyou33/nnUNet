@@ -410,12 +410,12 @@ class Generic_UNetPlusPlus(SegmentationNetwork):
         x0_3 = self.loc2[2](torch.cat([x0_0, x0_1, x0_2, self.up2[2](x1_2)], 1))
         seg_outputs.append(self.final_nonlin(self.seg_outputs[-3](x0_3)))
 
-        x4_0 = self.conv_blocks_context[4](x3_0)
-        x3_1 = self.loc1[0](torch.cat([x3_0, self.up1[0](x4_0)], 1))
-        x2_2 = self.loc1[1](torch.cat([x2_0, x2_1, self.up1[1](x3_1)], 1))
-        x1_3 = self.loc1[2](torch.cat([x1_0, x1_1, x1_2, self.up1[2](x2_2)], 1))
-        x0_4 = self.loc1[3](torch.cat([x0_0, x0_1, x0_2, x0_3, self.up1[3](x1_3)], 1))
-        seg_outputs.append(self.final_nonlin(self.seg_outputs[-4](x0_4)))
+        # x4_0 = self.conv_blocks_context[4](x3_0)
+        # x3_1 = self.loc1[0](torch.cat([x3_0, self.up1[0](x4_0)], 1))
+        # x2_2 = self.loc1[1](torch.cat([x2_0, x2_1, self.up1[1](x3_1)], 1))
+        # x1_3 = self.loc1[2](torch.cat([x1_0, x1_1, x1_2, self.up1[2](x2_2)], 1))
+        # x0_4 = self.loc1[3](torch.cat([x0_0, x0_1, x0_2, x0_3, self.up1[3](x1_3)], 1))
+        # seg_outputs.append(self.final_nonlin(self.seg_outputs[-4](x0_4)))
 
         # x5_0 = self.conv_blocks_context[5](x4_0)
         # x4_1 = self.loc0[0](torch.cat([x4_0, self.up0[0](x5_0)], 1))
