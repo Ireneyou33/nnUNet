@@ -30,7 +30,7 @@ from batchgenerators.utilities.file_and_folder_operations import *
 from nnunet.training.network_training.competitions_with_custom_Trainers.BraTS2020.nnUNetTrainerV2BraTSRegions_moreDA import \
     nnUNetTrainerV2BraTSRegions_DA3_BN_BD, nnUNetTrainerV2BraTSRegions_DA4_BN, nnUNetTrainerV2BraTSRegions_DA4_BN_BD
 from nnunet.training.dataloading.dataset_loading import unpack_dataset
-from nnunet.network_architecture.seg_hrnet_ocr_3d import HighResolutionNet3D
+from nnunet.network_architecture.seg_hrnet_ocr_3d import HighResolutionNet3D, HighResolutionNet3D_HalfRes
 from nnunet.network_architecture.seg_hrnet_ocr import HighResolutionNet
 from nnunet.network_architecture.seg_hrnet_ocr_config_default import _C as config_default
 
@@ -38,7 +38,6 @@ nnunet_path = os.path.dirname(os.path.abspath(__file__))
 for i in range(4):
     nnunet_path = os.path.dirname(nnunet_path)
 print(f"nnunet_path: {nnunet_path}")
-
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 
@@ -84,7 +83,7 @@ class nnUNetHRNetOCRTrainerV2BraTS_Adam_w48_320(nnUNetTrainerV2):
             self.network.dropout_op = nn.Dropout3d
             self.network.norm_op = nn.InstanceNorm3d
         else:
-            self.network = HighResolutionNet(config=self.config,  num_input_channels=self.num_input_channels,
+            self.network = HighResolutionNet(config=self.config, num_input_channels=self.num_input_channels,
                                              num_classes=self.num_classes, deep_supervision=self.deep_supervision)
             self.network.conv_op = nn.Conv2d
             self.network.dropout_op = nn.Dropout2d
@@ -214,7 +213,7 @@ class nnUNetHRNetOCRTrainerV2BraTS_Adam_w48_320(nnUNetTrainerV2):
         return l.detach().cpu().numpy()
 
 
-class nnUNetHRNetOCRTrainerV2BraTS_Adam_500(nnUNetHRNetOCRTrainerV2BraTS_Adam_w48_320):
+class nnUNetHRNetOCRTrainerV2BraTS_Adam_w18_HalfRes_HalfChannel_320(nnUNetHRNetOCRTrainerV2BraTS_Adam_w48_320):
     """
     Info for Fabian: same as internal nnUNetTrainerV2_2
     """
@@ -223,55 +222,31 @@ class nnUNetHRNetOCRTrainerV2BraTS_Adam_500(nnUNetHRNetOCRTrainerV2BraTS_Adam_w4
                  unpack_data=True, deterministic=True, fp16=False):
         super().__init__(plans_file, fold, output_folder, dataset_directory, batch_dice, stage, unpack_data,
                          deterministic, fp16)
-        self.max_num_epochs = 500  # anning 2021-07-13 from 1000 to 160 40000 iterations
-
-
-class nnUNetHRNetOCRTrainerV2BraTSRegions_DA3_BN_BD_Adam(nnUNetTrainerV2BraTSRegions_DA3_BN_BD):
-    def __init__(self, plans_file, fold, output_folder=None, dataset_directory=None, batch_dice=True, stage=None,
-                 unpack_data=True, deterministic=True, fp16=False):
-        super().__init__(plans_file, fold, output_folder, dataset_directory, batch_dice, stage, unpack_data,
-                         deterministic, fp16)
-        self.regions = get_brats_regions()
-        self.regions_class_order = (1, 3, 2)  # 如果是(1, 2, 3)，和baseline的标签不同，需要改为(1, 3, 2)
         self.patience = 20  # 如果 50 个轮次MA没有减低，停止训练
         self.max_num_epochs = 320  # anning 2021-07-13 from 1000 to 160 40000 iterations
         self.initial_lr = 1e-3  # anning 2021-07-13 from 1e-2 to 1e-3
+        self.config = os.path.join(current_dir, "seg_hrnet_ocr_w18_128_128_128_HalfChannel.yaml")
+        self.config = update_config(config_default, self.config)
+        self.deep_supervision = True
 
-    def initialize_optimizer_and_scheduler(self):
-        assert self.network is not None, "self.initialize_network must be called first"
-        self.optimizer = torch.optim.AdamW(self.network.parameters(), self.initial_lr)
-        self.lr_scheduler = None
+    def initialize_network(self):
+        """
+        :return:
+        """
+        if self.threeD:
+            self.network = HighResolutionNet3D_HalfRes(config=self.config, num_input_channels=self.num_input_channels,
+                                                       num_classes=self.num_classes,
+                                                       deep_supervision=self.deep_supervision)
+            self.network.conv_op = nn.Conv3d
+            self.network.dropout_op = nn.Dropout3d
+            self.network.norm_op = nn.InstanceNorm3d
+        else:
+            self.network = HighResolutionNet(config=self.config, num_input_channels=self.num_input_channels,
+                                             num_classes=self.num_classes, deep_supervision=self.deep_supervision)
+            self.network.conv_op = nn.Conv2d
+            self.network.dropout_op = nn.Dropout2d
+            self.network.norm_op = nn.InstanceNorm2d
 
-
-class nnUNetHRNetOCRTrainerV2BraTSRegions_DA4_BN_Adam(nnUNetTrainerV2BraTSRegions_DA4_BN):
-    def __init__(self, plans_file, fold, output_folder=None, dataset_directory=None, batch_dice=True, stage=None,
-                 unpack_data=True, deterministic=True, fp16=False):
-        super().__init__(plans_file, fold, output_folder, dataset_directory, batch_dice, stage, unpack_data,
-                         deterministic, fp16)
-        self.regions = get_brats_regions()
-        self.regions_class_order = (1, 3, 2)  # 如果是(1, 2, 3)，和baseline的标签不同，需要改为(1, 3, 2)
-        self.patience = 20  # 如果 50 个轮次MA没有减低，停止训练
-        self.max_num_epochs = 320  # anning 2021-07-13 from 1000 to 160 40000 iterations
-        self.initial_lr = 1e-3  # anning 2021-07-13 from 1e-2 to 1e-3
-
-    def initialize_optimizer_and_scheduler(self):
-        assert self.network is not None, "self.initialize_network must be called first"
-        self.optimizer = torch.optim.AdamW(self.network.parameters(), self.initial_lr)
-        self.lr_scheduler = None
-
-
-class nnUNetHRNetOCRTrainerV2BraTSRegions_DA4_BN_BD_Adam(nnUNetTrainerV2BraTSRegions_DA4_BN_BD):
-    def __init__(self, plans_file, fold, output_folder=None, dataset_directory=None, batch_dice=True, stage=None,
-                 unpack_data=True, deterministic=True, fp16=False):
-        super().__init__(plans_file, fold, output_folder, dataset_directory, batch_dice, stage, unpack_data,
-                         deterministic, fp16)
-        self.regions = get_brats_regions()
-        self.regions_class_order = (1, 3, 2)  # 如果是(1, 2, 3)，和baseline的标签不同，需要改为(1, 3, 2)
-        self.patience = 20  # 如果 50 个轮次MA没有减低，停止训练
-        self.max_num_epochs = 320  # anning 2021-07-13 from 1000 to 160 40000 iterations
-        self.initial_lr = 1e-3  # anning 2021-07-13 from 1e-2 to 1e-3
-
-    def initialize_optimizer_and_scheduler(self):
-        assert self.network is not None, "self.initialize_network must be called first"
-        self.optimizer = torch.optim.AdamW(self.network.parameters(), self.initial_lr)
-        self.lr_scheduler = None
+        if torch.cuda.is_available():
+            self.network.cuda()
+        self.network.inference_apply_nonlin = softmax_helper

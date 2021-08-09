@@ -693,6 +693,18 @@ class HighResolutionNet3D(SegmentationNetwork):
             raise RuntimeError('No such file {}'.format(pretrained))
 
 
+class HighResolutionNet3D_HalfRes(HighResolutionNet3D):
+
+    def __init__(self, config, **kwargs):
+        super(HighResolutionNet3D_HalfRes, self).__init__(config, **kwargs)
+        # stem net
+        self.conv1 = nn.Conv3d(self.num_input_channels, 64, kernel_size=3, stride=2, padding=1, bias=False)
+        self.bn1 = nn.BatchNorm3d(64)
+        self.conv2 = nn.Conv3d(64, 64, kernel_size=3, stride=1, padding=1, bias=False)
+        self.bn2 = nn.BatchNorm3d(64)
+        self.relu = nn.ReLU(inplace=relu_inplace)
+
+
 def get_seg_model(cfg, **kwargs):
     model = HighResolutionNet3D(cfg, **kwargs)
     model.init_weights(cfg.MODEL.PRETRAINED)
