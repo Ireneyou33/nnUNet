@@ -86,7 +86,7 @@ class nnUNetTrainerV2BraTS_BD_Adam_320(nnUNetTrainerV2BraTS_Adam):
         self.loss = DC_and_CE_loss({'batch_dice': True, 'smooth': 1e-5, 'do_bg': False}, {})
 
 
-class nnUNetTrainerV2BraTS_BD_HalfHGG_Adam_320(nnUNetTrainerV2BraTS_Adam):
+class nnUNetTrainerV2BraTS_Adam_HalfHGG_BD_320(nnUNetTrainerV2BraTS_Adam):
     """
     Info for Fabian: same as internal nnUNetTrainerV2_2
     """
