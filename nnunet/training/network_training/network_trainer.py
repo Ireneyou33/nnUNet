@@ -531,6 +531,7 @@ class NetworkTrainer(object):
         (not a minimization, but a maximization of a metric and therefore the - in the latter case)
         :return:
         """
+        self.print_to_log_file("current all_val_eval_metrics is ", self.best_val_eval_criterion_MA)
         if self.val_eval_criterion_MA is None:
             if len(self.all_val_eval_metrics) == 0:
                 self.val_eval_criterion_MA = - self.all_val_losses[-1]
@@ -568,8 +569,8 @@ class NetworkTrainer(object):
             # check if the current epoch is the best one according to moving average of validation criterion. If so
             # then save 'best' model
             # Do not use this for validation. This is intended for test set prediction only.
-            #self.print_to_log_file("current best_val_eval_criterion_MA is %.4f0" % self.best_val_eval_criterion_MA)
-            #self.print_to_log_file("current val_eval_criterion_MA is %.4f" % self.val_eval_criterion_MA)
+            self.print_to_log_file("current best_val_eval_criterion_MA is %.4f0" % self.best_val_eval_criterion_MA)
+            self.print_to_log_file("current val_eval_criterion_MA is %.4f" % self.val_eval_criterion_MA)
 
             if self.val_eval_criterion_MA > self.best_val_eval_criterion_MA:
                 self.best_val_eval_criterion_MA = self.val_eval_criterion_MA
