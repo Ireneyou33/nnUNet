@@ -35,18 +35,21 @@ if __name__ == "__main__":
     """
     parser = argparse.ArgumentParser()
     parser.add_argument("-p", '--pred-folder', help="", required=True)
-    parser.add_argument('-o', "--img-out-folder", help="", required=True)
+    parser.add_argument('-o', "--img-out-folder", help="", required=False)
 
     args = parser.parse_args()
 
     data_dir_pred = args.pred_folder
-    img_dir = args.img_out_folder
+    if args.img_out_folder is None:
+        img_dir = os.path.join(os.path.dirname(data_dir_pred), "Img")
+    else:
+        img_dir = args.img_out_folder
 
     task_name = "Task501_BraTS2021"
     downloaded_data_dir_val = "/mnt/ngshare/PersonData/anning/Dataset/RawData/MICCAI_BraTS2021_ValidationData"
 
     evaluate_file = os.path.join(data_dir_pred, "results.csv")  # 预测结果的评价指标文件
-    grading_file = os.path.join(current_path, "grading_res.csv")  # HGG_LGG结果文件
+    grading_file = os.path.join(current_path, "grading_res_valid.csv")  # HGG_LGG结果文件
 
     print(f'data_dir_pred : {data_dir_pred}')
     # print(f'data_dir_gt   : {data_dir_gt}')

@@ -35,13 +35,16 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("-p", '--pred-folder', help="模型预测结果", required=True)
     parser.add_argument('-g', "--gt-folder", help="真实结果", required=True)
-    parser.add_argument('-o', "--img-out-folder", help="", required=True)
+    parser.add_argument('-o', "--img-out-folder", help="", required=False)
 
     args = parser.parse_args()
 
     data_dir_pred = args.pred_folder
     data_dir_gt = args.gt_folder
-    img_dir = args.img_out_folder
+    if args.img_out_folder is None:
+        img_dir = os.path.join(os.path.dirname(data_dir_pred), "Img")
+    else:
+        img_dir = args.img_out_folder
 
     task_name = "Task501_BraTS2021"
     downloaded_data_dir = "/mnt/ngshare/PersonData/anning/Dataset/RawData/MICCAI_BraTS2021_TrainingData"
