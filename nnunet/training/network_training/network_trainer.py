@@ -531,7 +531,7 @@ class NetworkTrainer(object):
         (not a minimization, but a maximization of a metric and therefore the - in the latter case)
         :return:
         """
-        self.print_to_log_file("current all_val_eval_metrics is ", self.best_val_eval_criterion_MA)
+        self.print_to_log_file("current all_val_eval_metrics is ", self.all_val_eval_metrics)
         if self.val_eval_criterion_MA is None:
             if len(self.all_val_eval_metrics) == 0:
                 self.val_eval_criterion_MA = - self.all_val_losses[-1]
