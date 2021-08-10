@@ -67,9 +67,9 @@ class nnUNetPlusPlusTrainerV2(nnUNetTrainer):
 
             if force_load_plans or (self.plans is None):
                 self.load_plans_file()
-                self.plans['plans_per_stage'][0]['patch_size'] = np.array([96, 96, 96])
-                print("Patch size is %s" % self.plans['plans_per_stage'][0]['patch_size'])
-                self.plans['plans_per_stage'][0]['batch_size'] = 1
+                # self.plans['plans_per_stage'][0]['patch_size'] = np.array([96, 96, 96])
+                # print("Patch size is %s" % self.plans['plans_per_stage'][0]['patch_size'])
+                # self.plans['plans_per_stage'][0]['batch_size'] = 1
                 # if self.norm_cfg == 'BN':
                 #     self.plans['plans_per_stage'][0]['batch_size'] = 1
                 #
@@ -362,8 +362,10 @@ class nnUNetPlusPlusTrainerV2(nnUNetTrainer):
         # self.deep_supervision_scales = [[1, 1, 1]] + list(list(i) for i in 1 / np.cumprod(
         #     np.vstack(self.net_num_pool_op_kernel_sizes), axis=0))[:-1]
 
-        # anning 将深度监督的scales改为不下采样
-        self.deep_supervision_scales = [[1, 1, 1]] + [[1, 1, 1]] * len(list(list(i) for i in 1 / np.cumprod(
+        # anning 将深度监督的scales改为不下采样，且去掉一个stage
+        # self.deep_supervision_scales = [[1, 1, 1]] + [[1, 1, 1]] * len(list(list(i) for i in 1 / np.cumprod(
+        #     np.vstack(self.net_num_pool_op_kernel_sizes), axis=0))[:-1])
+        self.deep_supervision_scales = [[1, 1, 1]] * len(list(list(i) for i in 1 / np.cumprod(
             np.vstack(self.net_num_pool_op_kernel_sizes), axis=0))[:-1])
         if self.threeD:
             self.data_aug_params = default_3D_augmentation_params
