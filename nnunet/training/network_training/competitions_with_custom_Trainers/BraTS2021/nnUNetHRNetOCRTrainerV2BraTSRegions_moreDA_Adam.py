@@ -269,6 +269,75 @@ class nnUNetHRNetOCRTrainerV2BraTS_Adam_w18_FullRes_320(nnUNetHRNetOCRTrainerV2B
         self.config = update_config(config_default, self.config)
         self.deep_supervision = True
 
+    def initialize(self, training=True, force_load_plans=False):
+        """
+        - replaced get_default_augmentation with get_moreDA_augmentation
+        - enforce to only run this code once
+        - loss function wrapper for deep supervision
+
+        :param training:
+        :param force_load_plans:
+        :return:
+        """
+        if not self.was_initialized:
+            maybe_mkdir_p(self.output_folder)
+
+            if force_load_plans or (self.plans is None):
+                self.load_plans_file()
+            print("Patch size is %s" % self.plans['plans_per_stage'][0]['patch_size'])
+            self.plans['plans_per_stage'][0]['batch_size'] = 1
+            self.process_plans(self.plans)
+
+            self.setup_DA_params()
+
+            # ################ Here we wrap the loss for deep supervision ############
+            self.deep_supervision = True
+            self.deep_supervision_scales = [[1, 1, 1]] * 2
+
+            # in HRNetOCR, We set the two weights [1, 0.4]，最终输出的权重为1，粗分割的权重为0.4
+            self.ds_loss_weights = np.array([1, 0.4])
+            # now wrap the loss
+            # self.loss = DC_and_CE_loss({'batch_dice': self.batch_dice, 'smooth': 1e-5, 'do_bg': False}, {})
+            self.loss = MultipleOutputLoss2(self.loss, self.ds_loss_weights)
+            # ################ END ###################
+
+            self.folder_with_preprocessed_data = join(self.dataset_directory, self.plans['data_identifier'] +
+                                                      "_stage%d" % self.stage)
+            if training:
+                self.dl_tr, self.dl_val = self.get_basic_generators()
+                if self.unpack_data:
+                    print("unpacking dataset")
+                    unpack_dataset(self.folder_with_preprocessed_data)
+                    print("done")
+                else:
+                    print(
+                        "INFO: Not unpacking data! Training may be slow due to that. Pray you are not using 2d or you "
+                        "will wait all winter for your model to finish!")
+
+                self.tr_gen, self.val_gen = get_moreDA_augmentation(
+                    self.dl_tr, self.dl_val,
+                    self.data_aug_params[
+                        'patch_size_for_spatialtransform'],
+                    self.data_aug_params,
+                    deep_supervision_scales=self.deep_supervision_scales,
+                    pin_memory=self.pin_memory,
+                    use_nondetMultiThreadedAugmenter=False
+                )
+                self.print_to_log_file("TRAINING KEYS:\n %s" % (str(self.dataset_tr.keys())),
+                                       also_print_to_console=False)
+                self.print_to_log_file("VALIDATION KEYS:\n %s" % (str(self.dataset_val.keys())),
+                                       also_print_to_console=False)
+            else:
+                pass
+
+            self.initialize_network()
+            self.initialize_optimizer_and_scheduler()
+
+            assert isinstance(self.network, (SegmentationNetwork, nn.DataParallel))
+        else:
+            self.print_to_log_file('self.was_initialized is True, not running self.initialize again')
+        self.was_initialized = True
+
     def initialize_network(self):
         """
         :return:
