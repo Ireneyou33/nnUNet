@@ -407,3 +407,23 @@ class nnUNetCoTrResTransTrainerV2BraTS_Adam_160(nnUNetTrainerV2_CoTr_ResTrans):
         self.pin_memory = True
 
         self.save_best_checkpoint = True
+
+
+class nnUNetCoTrResTransTrainerV2BraTS_Adam_320(nnUNetTrainerV2_CoTr_ResTrans):
+
+    def __init__(self, plans_file, fold, output_folder=None, dataset_directory=None, batch_dice=True, stage=None,
+                 unpack_data=True, deterministic=True, fp16=False):
+        super().__init__(plans_file, fold, output_folder, dataset_directory, batch_dice, stage, unpack_data,
+                         deterministic, fp16)
+        self.max_num_epochs = 320
+        self.patience = 30
+        self.initial_lr = 1e-3
+        self.deep_supervision_scales = None
+        self.ds_loss_weights = None
+
+        self.norm_cfg = "IN"
+        self.activation_cfg = "LeakyReLU"
+
+        self.pin_memory = True
+
+        self.save_best_checkpoint = True
