@@ -149,18 +149,6 @@ class nnUNetTrainerV2_CoTr_ResTrans(nnUNetTrainerV2):
         self.optimizer = torch.optim.AdamW(self.network.parameters(), self.initial_lr)
         self.lr_scheduler = None
 
-    def run_online_evaluation(self, output, target):
-        """
-        due to deep supervision the return value and the reference are now lists of tensors. We only need the full
-        resolution output because this is what we are interested in in the end. The others are ignored
-        :param output:
-        :param target:
-        :return:
-        """
-        target = target[0]
-        output = output[0]
-        return super().run_online_evaluation(output, target)
-
     def validate(self, do_mirroring: bool = True, use_sliding_window: bool = True,
                  step_size: float = 0.5, save_softmax: bool = True, use_gaussian: bool = True, overwrite: bool = True,
                  validation_folder_name: str = 'validation_raw', debug: bool = False, all_in_gpu: bool = False,
@@ -229,6 +217,8 @@ class nnUNetTrainerV2_CoTr_ResTrans(nnUNetTrainerV2):
             with autocast():
                 output = self.network(data)
                 del data
+                # print(len(output), len(target))
+                # print(output[0].shape, target[0].shape)
                 l = self.loss(output, target)
 
             if do_backprop:
