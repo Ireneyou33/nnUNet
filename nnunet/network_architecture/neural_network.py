@@ -525,6 +525,8 @@ class SegmentationNetwork(NeuralNetwork):
             mirror_idx = 1
             num_results = 1
 
+        print(f"mirror_idx : {mirror_idx}")
+
         for m in range(mirror_idx):
             if m == 0:
                 pred = self.inference_apply_nonlin(self(x))
