@@ -93,8 +93,8 @@ class nnUNetPlusPlusTrainerV2(nnUNetTrainer):
             mask = np.array([True] + [True if i < net_numpool - 1 else False for i in range(1, net_numpool)])
             weights[~mask] = 0
             weights = weights / weights.sum()
-            # self.ds_loss_weights = weights
-            self.ds_loss_weights = None  # TODO 增加loss权重
+            self.ds_loss_weights = weights
+            # self.ds_loss_weights = None  # TODO 增加loss权重
             # now wrap the loss
             self.loss = MultipleOutputLoss2(self.loss, self.ds_loss_weights)
             ################# END ###################
@@ -518,25 +518,6 @@ class nnUNetPlusPlusTrainerV2BraTS_FiveStage_Weight_5e4_Adam_320(nnUNetPlusPlusT
         assert self.network is not None, "self.initialize_network must be called first"
         self.optimizer = torch.optim.AdamW(self.network.parameters(), self.initial_lr)
         self.lr_scheduler = None
-
-        # ################ Here we wrap the loss for deep supervision ############
-        # we need to know the number of outputs of the network
-        net_numpool = len(self.net_num_pool_op_kernel_sizes)
-
-        # we give each output a weight which decreases exponentially (division by 2) as the resolution decreases
-        # this gives higher resolution outputs more weight in the loss
-        weights = np.array([1 / (2 ** i) for i in range(net_numpool)])
-
-        # we don't use the lowest 2 outputs. Normalize weights so that they sum to 1
-        mask = np.array([True] + [True if i < net_numpool - 1 else False for i in range(1, net_numpool)])
-        weights[~mask] = 0
-        weights = weights / weights.sum()
-        # 打开每层结果的权重
-        self.ds_loss_weights = weights
-        # self.ds_loss_weights = None
-        # now wrap the loss
-        print(f"self.ds_loss_weights ： {self.ds_loss_weights}")
-        self.loss = MultipleOutputLoss2(self.loss, self.ds_loss_weights)
 
 
 class nnUNetPlusPlusTrainerV2BraTS_ThreeStage_Adam_320(nnUNetPlusPlusTrainerV2):
