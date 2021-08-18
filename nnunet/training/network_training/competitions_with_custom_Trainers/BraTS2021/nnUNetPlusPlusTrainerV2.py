@@ -535,6 +535,7 @@ class nnUNetPlusPlusTrainerV2BraTS_FiveStage_Weight_5e4_Adam_320(nnUNetPlusPlusT
         self.ds_loss_weights = weights
         # self.ds_loss_weights = None
         # now wrap the loss
+        print(f"self.ds_loss_weights ： {self.ds_loss_weights}")
         self.loss = MultipleOutputLoss2(self.loss, self.ds_loss_weights)
 
 
