@@ -501,6 +501,43 @@ class nnUNetPlusPlusTrainerV2BraTS_FiveStage_Adam_320(nnUNetPlusPlusTrainerV2):
         self.lr_scheduler = None
 
 
+class nnUNetPlusPlusTrainerV2BraTS_FiveStage_Weight_5e4_Adam_320(nnUNetPlusPlusTrainerV2):
+    """
+    Info for Fabian: same as internal nnUNetPlusPlusTrainerV2_2
+    """
+
+    def __init__(self, plans_file, fold, output_folder=None, dataset_directory=None, batch_dice=True, stage=None,
+                 unpack_data=True, deterministic=True, fp16=False):
+        super().__init__(plans_file, fold, output_folder, dataset_directory, batch_dice, stage, unpack_data,
+                         deterministic, fp16)
+        self.patience = 20  # 如果 50 个轮次MA没有减低，停止训练
+        self.max_num_epochs = 320  # anning 2021-07-13 from 1000 to 160 40000 iterations
+        self.initial_lr = 5e-4  # anning 2021-07-13 from 1e-2 to 1e-3
+
+    def initialize_optimizer_and_scheduler(self):
+        assert self.network is not None, "self.initialize_network must be called first"
+        self.optimizer = torch.optim.AdamW(self.network.parameters(), self.initial_lr)
+        self.lr_scheduler = None
+
+        # ################ Here we wrap the loss for deep supervision ############
+        # we need to know the number of outputs of the network
+        net_numpool = len(self.net_num_pool_op_kernel_sizes)
+
+        # we give each output a weight which decreases exponentially (division by 2) as the resolution decreases
+        # this gives higher resolution outputs more weight in the loss
+        weights = np.array([1 / (2 ** i) for i in range(net_numpool)])
+
+        # we don't use the lowest 2 outputs. Normalize weights so that they sum to 1
+        mask = np.array([True] + [True if i < net_numpool - 1 else False for i in range(1, net_numpool)])
+        weights[~mask] = 0
+        weights = weights / weights.sum()
+        # 打开每层结果的权重
+        self.ds_loss_weights = weights
+        # self.ds_loss_weights = None
+        # now wrap the loss
+        self.loss = MultipleOutputLoss2(self.loss, self.ds_loss_weights)
+
+
 class nnUNetPlusPlusTrainerV2BraTS_ThreeStage_Adam_320(nnUNetPlusPlusTrainerV2):
     """
     Info for Fabian: same as internal nnUNetPlusPlusTrainerV2_2
