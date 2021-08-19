@@ -455,3 +455,42 @@ class nnUNetHRNetOCRTrainerV2BraTS_Adam_w18_HalfRes_FullChannel_5e4_320(nnUNetHR
         if torch.cuda.is_available():
             self.network.cuda()
         self.network.inference_apply_nonlin = softmax_helper
+
+
+class nnUNetHRNetOCRTrainerV2BraTS_Adam_w18_HalfRes_FullChannel_2e4_320(nnUNetHRNetOCRTrainerV2BraTS_Adam_w18_FullRes_FullChannel_320):
+    """
+    Info for Fabian: same as internal nnUNetTrainerV2_2
+    """
+
+    def __init__(self, plans_file, fold, output_folder=None, dataset_directory=None, batch_dice=True, stage=None,
+                 unpack_data=True, deterministic=True, fp16=False):
+        super().__init__(plans_file, fold, output_folder, dataset_directory, batch_dice, stage, unpack_data,
+                         deterministic, fp16)
+        self.patience = 20  # 如果 50 个轮次MA没有减低，停止训练
+        self.max_num_epochs = 320  # anning 2021-07-13 from 1000 to 160 40000 iterations
+        self.initial_lr = 2e-4  # anning 2021-07-13 from 1e-2 to 1e-3
+        self.config = os.path.join(current_dir, "seg_hrnet_ocr_w18_128_128_128.yaml")
+        self.config = update_config(config_default, self.config)
+        self.deep_supervision = True
+
+    def initialize_network(self):
+        """
+        :return:
+        """
+        if self.threeD:
+            self.network = HighResolutionNet3D_HalfRes(config=self.config, num_input_channels=self.num_input_channels,
+                                                       num_classes=self.num_classes,
+                                                       deep_supervision=self.deep_supervision)
+            self.network.conv_op = nn.Conv3d
+            self.network.dropout_op = nn.Dropout3d
+            self.network.norm_op = nn.InstanceNorm3d
+        else:
+            self.network = HighResolutionNet(config=self.config, num_input_channels=self.num_input_channels,
+                                             num_classes=self.num_classes, deep_supervision=self.deep_supervision)
+            self.network.conv_op = nn.Conv2d
+            self.network.dropout_op = nn.Dropout2d
+            self.network.norm_op = nn.InstanceNorm2d
+
+        if torch.cuda.is_available():
+            self.network.cuda()
+        self.network.inference_apply_nonlin = softmax_helper
