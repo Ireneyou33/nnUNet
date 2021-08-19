@@ -410,20 +410,20 @@ class Generic_UNetPlusPlus(SegmentationNetwork):
         x0_3 = self.loc2[2](torch.cat([x0_0, x0_1, x0_2, self.up2[2](x1_2)], 1))
         seg_outputs.append(self.final_nonlin(self.seg_outputs[-3](x0_3)))
 
-        # x4_0 = self.conv_blocks_context[4](x3_0)
-        # x3_1 = self.loc1[0](torch.cat([x3_0, self.up1[0](x4_0)], 1))
-        # x2_2 = self.loc1[1](torch.cat([x2_0, x2_1, self.up1[1](x3_1)], 1))
-        # x1_3 = self.loc1[2](torch.cat([x1_0, x1_1, x1_2, self.up1[2](x2_2)], 1))
-        # x0_4 = self.loc1[3](torch.cat([x0_0, x0_1, x0_2, x0_3, self.up1[3](x1_3)], 1))
-        # seg_outputs.append(self.final_nonlin(self.seg_outputs[-4](x0_4)))
+        x4_0 = self.conv_blocks_context[4](x3_0)
+        x3_1 = self.loc1[0](torch.cat([x3_0, self.up1[0](x4_0)], 1))
+        x2_2 = self.loc1[1](torch.cat([x2_0, x2_1, self.up1[1](x3_1)], 1))
+        x1_3 = self.loc1[2](torch.cat([x1_0, x1_1, x1_2, self.up1[2](x2_2)], 1))
+        x0_4 = self.loc1[3](torch.cat([x0_0, x0_1, x0_2, x0_3, self.up1[3](x1_3)], 1))
+        seg_outputs.append(self.final_nonlin(self.seg_outputs[-4](x0_4)))
 
-        # x5_0 = self.conv_blocks_context[5](x4_0)
-        # x4_1 = self.loc0[0](torch.cat([x4_0, self.up0[0](x5_0)], 1))
-        # x3_2 = self.loc0[1](torch.cat([x3_0, x3_1, self.up0[1](x4_1)], 1))
-        # x2_3 = self.loc0[2](torch.cat([x2_0, x2_1, x2_2, self.up0[2](x3_2)], 1))
-        # x1_4 = self.loc0[3](torch.cat([x1_0, x1_1, x1_2, x1_3, self.up0[3](x2_3)], 1))
-        # x0_5 = self.loc0[4](torch.cat([x0_0, x0_1, x0_2, x0_3, x0_4, self.up0[4](x1_4)], 1))
-        # seg_outputs.append(self.final_nonlin(self.seg_outputs[-5](x0_5)))
+        x5_0 = self.conv_blocks_context[5](x4_0)
+        x4_1 = self.loc0[0](torch.cat([x4_0, self.up0[0](x5_0)], 1))
+        x3_2 = self.loc0[1](torch.cat([x3_0, x3_1, self.up0[1](x4_1)], 1))
+        x2_3 = self.loc0[2](torch.cat([x2_0, x2_1, x2_2, self.up0[2](x3_2)], 1))
+        x1_4 = self.loc0[3](torch.cat([x1_0, x1_1, x1_2, x1_3, self.up0[3](x2_3)], 1))
+        x0_5 = self.loc0[4](torch.cat([x0_0, x0_1, x0_2, x0_3, x0_4, self.up0[4](x1_4)], 1))
+        seg_outputs.append(self.final_nonlin(self.seg_outputs[-5](x0_5)))
 
         if self._deep_supervision and self.do_ds:
             return tuple([seg_outputs[-1]] + [i(j) for i, j in
@@ -458,7 +458,7 @@ class Generic_UNetPlusPlus(SegmentationNetwork):
                 tu.append(Upsample(scale_factor=self.pool_op_kernel_sizes[-(u + 1)], mode=self.upsample_mode))
             else:
                 tu.append(transpconv(nfeatures_from_down, nfeatures_from_skip, self.pool_op_kernel_sizes[-(u + 1)],
-                          self.pool_op_kernel_sizes[-(u + 1)], bias=False))
+                                     self.pool_op_kernel_sizes[-(u + 1)], bias=False))
 
             self.conv_kwargs['kernel_size'] = self.conv_kernel_sizes[- (u + 1)]
             self.conv_kwargs['padding'] = self.conv_pad_sizes[- (u + 1)]
@@ -508,10 +508,108 @@ class Generic_UNetPlusPlus(SegmentationNetwork):
             for pi in range(len(num_pool_per_axis)):
                 map_size[pi] /= pool_op_kernel_sizes[p][pi]
             num_feat = min(num_feat * 2, max_num_features)
-            num_blocks = (conv_per_stage * 2 + 1) if p < (npool - 1) else conv_per_stage  # conv_per_stage + conv_per_stage for the convs of encode/decode and 1 for transposed conv
+            num_blocks = (conv_per_stage * 2 + 1) if p < (
+                    npool - 1) else conv_per_stage  # conv_per_stage + conv_per_stage for the convs of encode/decode and 1 for transposed conv
             tmp += num_blocks * np.prod(map_size, dtype=np.int64) * num_feat
             if deep_supervision and p < (npool - 2):
                 tmp += np.prod(map_size, dtype=np.int64) * num_classes
             # print(p, map_size, num_feat, tmp)
         return tmp
 
+
+class Generic_UNetPlusPlus_ThreeStage(Generic_UNetPlusPlus):
+    DEFAULT_BATCH_SIZE_3D = 2
+    DEFAULT_PATCH_SIZE_3D = (64, 192, 160)
+    SPACING_FACTOR_BETWEEN_STAGES = 2
+    BASE_NUM_FEATURES_3D = 30
+    MAX_NUMPOOL_3D = 999
+    MAX_NUM_FILTERS_3D = 320
+
+    DEFAULT_PATCH_SIZE_2D = (256, 256)
+    BASE_NUM_FEATURES_2D = 30
+    DEFAULT_BATCH_SIZE_2D = 50
+    MAX_NUMPOOL_2D = 999
+    MAX_FILTERS_2D = 480
+
+    use_this_for_batch_size_computation_2D = 19739648
+    use_this_for_batch_size_computation_3D = 520000000 * 2  # 505789440
+
+    def __init__(self, input_channels, base_num_features, num_classes, num_pool, num_conv_per_stage=2,
+                 feat_map_mul_on_downscale=2, conv_op=nn.Conv2d,
+                 norm_op=nn.BatchNorm2d, norm_op_kwargs=None,
+                 dropout_op=nn.Dropout2d, dropout_op_kwargs=None,
+                 nonlin=nn.LeakyReLU, nonlin_kwargs=None, deep_supervision=True, dropout_in_localization=False,
+                 final_nonlin=softmax_helper, weightInitializer=InitWeights_He(1e-2), pool_op_kernel_sizes=None,
+                 conv_kernel_sizes=None,
+                 upscale_logits=False, convolutional_pooling=False, convolutional_upsampling=False,
+                 max_num_features=None, basic_block=ConvDropoutNormNonlin,
+                 seg_output_use_bias=False):
+        """
+        basically more flexible than v1, architecture is the same
+
+        Does this look complicated? Nah bro. Functionality > usability
+
+        This does everything you need, including world peace.
+
+        Questions? -> f.isensee@dkfz.de
+        """
+        super(Generic_UNetPlusPlus_ThreeStage, self).__init__(input_channels, base_num_features, num_classes, num_pool,
+                                                              num_conv_per_stage=num_conv_per_stage,
+                                                              feat_map_mul_on_downscale=feat_map_mul_on_downscale,
+                                                              conv_op=conv_op,
+                                                              norm_op=norm_op, norm_op_kwargs=norm_op_kwargs,
+                                                              dropout_op=dropout_op,
+                                                              dropout_op_kwargs=dropout_op_kwargs,
+                                                              nonlin=nonlin, nonlin_kwargs=nonlin_kwargs,
+                                                              deep_supervision=deep_supervision,
+                                                              dropout_in_localization=dropout_in_localization,
+                                                              final_nonlin=final_nonlin,
+                                                              weightInitializer=weightInitializer,
+                                                              pool_op_kernel_sizes=pool_op_kernel_sizes,
+                                                              conv_kernel_sizes=conv_kernel_sizes,
+                                                              upscale_logits=upscale_logits,
+                                                              convolutional_pooling=convolutional_pooling,
+                                                              convolutional_upsampling=convolutional_upsampling,
+                                                              max_num_features=max_num_features,
+                                                              basic_block=basic_block,
+                                                              seg_output_use_bias=seg_output_use_bias)
+
+    def forward(self, x):
+        # skips = []
+        seg_outputs = []
+        x0_0 = self.conv_blocks_context[0](x)
+        x1_0 = self.conv_blocks_context[1](x0_0)
+        x0_1 = self.loc4[0](torch.cat([x0_0, self.up4[0](x1_0)], 1))
+        seg_outputs.append(self.final_nonlin(self.seg_outputs[-1](x0_1)))
+
+        x2_0 = self.conv_blocks_context[2](x1_0)
+        x1_1 = self.loc3[0](torch.cat([x1_0, self.up3[0](x2_0)], 1))
+        x0_2 = self.loc3[1](torch.cat([x0_0, x0_1, self.up3[1](x1_1)], 1))
+        seg_outputs.append(self.final_nonlin(self.seg_outputs[-2](x0_2)))
+
+        x3_0 = self.conv_blocks_context[3](x2_0)
+        x2_1 = self.loc2[0](torch.cat([x2_0, self.up2[0](x3_0)], 1))
+        x1_2 = self.loc2[1](torch.cat([x1_0, x1_1, self.up2[1](x2_1)], 1))
+        x0_3 = self.loc2[2](torch.cat([x0_0, x0_1, x0_2, self.up2[2](x1_2)], 1))
+        seg_outputs.append(self.final_nonlin(self.seg_outputs[-3](x0_3)))
+
+        # x4_0 = self.conv_blocks_context[4](x3_0)
+        # x3_1 = self.loc1[0](torch.cat([x3_0, self.up1[0](x4_0)], 1))
+        # x2_2 = self.loc1[1](torch.cat([x2_0, x2_1, self.up1[1](x3_1)], 1))
+        # x1_3 = self.loc1[2](torch.cat([x1_0, x1_1, x1_2, self.up1[2](x2_2)], 1))
+        # x0_4 = self.loc1[3](torch.cat([x0_0, x0_1, x0_2, x0_3, self.up1[3](x1_3)], 1))
+        # seg_outputs.append(self.final_nonlin(self.seg_outputs[-4](x0_4)))
+        #
+        # x5_0 = self.conv_blocks_context[5](x4_0)
+        # x4_1 = self.loc0[0](torch.cat([x4_0, self.up0[0](x5_0)], 1))
+        # x3_2 = self.loc0[1](torch.cat([x3_0, x3_1, self.up0[1](x4_1)], 1))
+        # x2_3 = self.loc0[2](torch.cat([x2_0, x2_1, x2_2, self.up0[2](x3_2)], 1))
+        # x1_4 = self.loc0[3](torch.cat([x1_0, x1_1, x1_2, x1_3, self.up0[3](x2_3)], 1))
+        # x0_5 = self.loc0[4](torch.cat([x0_0, x0_1, x0_2, x0_3, x0_4, self.up0[4](x1_4)], 1))
+        # seg_outputs.append(self.final_nonlin(self.seg_outputs[-5](x0_5)))
+
+        if self._deep_supervision and self.do_ds:
+            return tuple([seg_outputs[-1]] + [i(j) for i, j in
+                                              zip(list(self.upscale_logits_ops)[::-1], seg_outputs[:-1][::-1])])
+        else:
+            return seg_outputs[-1]

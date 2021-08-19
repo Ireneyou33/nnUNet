@@ -1,56 +1,45 @@
-#    Copyright 2020 Division of Medical Image Computing, German Cancer Research Center (DKFZ), Heidelberg, Germany
-#
-#    Licensed under the Apache License, Version 2.0 (the "License");
-#    you may not use this file except in compliance with the License.
-#    You may obtain a copy of the License at
-#
-#        http://www.apache.org/licenses/LICENSE-2.0
-#
-#    Unless required by applicable law or agreed to in writing, software
-#    distributed under the License is distributed on an "AS IS" BASIS,
-#    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-#    See the License for the specific language governing permissions and
-#    limitations under the License.
-
-
 from collections import OrderedDict
 from typing import Tuple
-import sys
+
 import numpy as np
 import torch
+import shutil
 from nnunet.training.loss_functions.deep_supervision import MultipleOutputLoss2
 from nnunet.utilities.to_torch import maybe_to_torch, to_cuda
 from nnunet.training.data_augmentation.data_augmentation_moreDA import get_moreDA_augmentation
-from nnunet.network_architecture.generic_UNetPlusPlus import Generic_UNetPlusPlus
 from nnunet.network_architecture.initialization import InitWeights_He
 from nnunet.network_architecture.neural_network import SegmentationNetwork
 from nnunet.training.data_augmentation.default_data_augmentation import default_2D_augmentation_params, \
     get_patch_size, default_3D_augmentation_params
 from nnunet.training.dataloading.dataset_loading import unpack_dataset
-from nnunet.training.network_training.nnUNetTrainer import nnUNetTrainer
+from nnunet.training.network_training.nnUNetTrainerV2 import nnUNetTrainerV2
 from nnunet.utilities.nd_softmax import softmax_helper
-from sklearn.model_selection import KFold
 from torch import nn
 from torch.cuda.amp import autocast
 from nnunet.training.learning_rate.poly_lr import poly_lr
 from batchgenerators.utilities.file_and_folder_operations import *
 
+from nnunet.network_architecture.CoTr_ResTranUnet import ResTranUnet
 
-class nnUNetPlusPlusTrainerV2(nnUNetTrainer):
-    """
-    Info for Fabian: same as internal nnUNetTrainerV2_2
-    """
+
+class nnUNetTrainerV2_CoTr_ResTrans(nnUNetTrainerV2):
 
     def __init__(self, plans_file, fold, output_folder=None, dataset_directory=None, batch_dice=True, stage=None,
                  unpack_data=True, deterministic=True, fp16=False):
         super().__init__(plans_file, fold, output_folder, dataset_directory, batch_dice, stage, unpack_data,
                          deterministic, fp16)
-        self.max_num_epochs = 1000
-        self.initial_lr = 1e-2
+        self.max_num_epochs = 160
+        self.patience = 30
+        self.initial_lr = 1e-3
         self.deep_supervision_scales = None
         self.ds_loss_weights = None
 
+        self.norm_cfg = "IN"
+        self.activation_cfg = "LeakyReLU"
+
         self.pin_memory = True
+
+        self.save_best_checkpoint = True
 
     def initialize(self, training=True, force_load_plans=False):
         """
@@ -67,13 +56,11 @@ class nnUNetPlusPlusTrainerV2(nnUNetTrainer):
 
             if force_load_plans or (self.plans is None):
                 self.load_plans_file()
-                # self.plans['plans_per_stage'][0]['patch_size'] = np.array([96, 96, 96])
-                # print("Patch size is %s" % self.plans['plans_per_stage'][0]['patch_size'])
-                # self.plans['plans_per_stage'][0]['batch_size'] = 1
-                # if self.norm_cfg == 'BN':
-                #     self.plans['plans_per_stage'][0]['batch_size'] = 1
-                #
-                # # self.plans['plans_per_stage'][0]['batch_size'] = 1   #Debug
+                print("Patch size is %s" % self.plans['plans_per_stage'][0]['patch_size'])
+                if self.norm_cfg == 'BN':
+                    self.plans['plans_per_stage'][0]['batch_size'] = 2
+
+                # self.plans['plans_per_stage'][0]['batch_size'] = 1   #Debug
                 print("Batch size is %s" % self.plans['plans_per_stage'][0]['batch_size'])
 
             self.process_plans(self.plans)
@@ -92,8 +79,7 @@ class nnUNetPlusPlusTrainerV2(nnUNetTrainer):
             mask = np.array([True] + [True if i < net_numpool - 1 else False for i in range(1, net_numpool)])
             weights[~mask] = 0
             weights = weights / weights.sum()
-            # self.ds_loss_weights = weights
-            self.ds_loss_weights = None
+            self.ds_loss_weights = weights
             # now wrap the loss
             self.loss = MultipleOutputLoss2(self.loss, self.ds_loss_weights)
             ################# END ###################
@@ -110,16 +96,14 @@ class nnUNetPlusPlusTrainerV2(nnUNetTrainer):
                     print(
                         "INFO: Not unpacking data! Training may be slow due to that. Pray you are not using 2d or you "
                         "will wait all winter for your model to finish!")
-                print(self.data_aug_params)
-                print(self.deep_supervision_scales)
+
                 self.tr_gen, self.val_gen = get_moreDA_augmentation(
                     self.dl_tr, self.dl_val,
                     self.data_aug_params[
                         'patch_size_for_spatialtransform'],
                     self.data_aug_params,
                     deep_supervision_scales=self.deep_supervision_scales,
-                    pin_memory=self.pin_memory,
-                    use_nondetMultiThreadedAugmenter=False
+                    pin_memory=self.pin_memory
                 )
                 self.print_to_log_file("TRAINING KEYS:\n %s" % (str(self.dataset_tr.keys())),
                                        also_print_to_console=False)
@@ -147,51 +131,23 @@ class nnUNetPlusPlusTrainerV2(nnUNetTrainer):
         Known issue: forgot to set neg_slope=0 in InitWeights_He; should not make a difference though
         :return:
         """
-        if self.threeD:
-            conv_op = nn.Conv3d
-            dropout_op = nn.Dropout3d
-            norm_op = nn.InstanceNorm3d
+        self.network = ResTranUnet(norm_cfg=self.norm_cfg, activation_cfg=self.activation_cfg,
+                                   img_size=self.plans['plans_per_stage'][0]['patch_size'],
+                                   num_classes=self.num_classes, weight_std=False, deep_supervision=True).cuda()
 
-        else:
-            conv_op = nn.Conv2d
-            dropout_op = nn.Dropout2d
-            norm_op = nn.InstanceNorm2d
+        total = sum([param.nelement() for param in self.network.parameters()])
+        print('  + Number of Network Params: %.2f(e6)' % (total / 1e6))
 
-        norm_op_kwargs = {'eps': 1e-5, 'affine': True}
-        dropout_op_kwargs = {'p': 0, 'inplace': True}
-        net_nonlin = nn.LeakyReLU
-        net_nonlin_kwargs = {'negative_slope': 1e-2, 'inplace': True}
-        self.network = Generic_UNetPlusPlus(self.num_input_channels, self.base_num_features, self.num_classes,
-                                            len(self.net_num_pool_op_kernel_sizes),
-                                            self.conv_per_stage, 2, conv_op, norm_op, norm_op_kwargs, dropout_op,
-                                            dropout_op_kwargs,
-                                            net_nonlin, net_nonlin_kwargs, True, False, lambda x: x,
-                                            InitWeights_He(1e-2),
-                                            self.net_num_pool_op_kernel_sizes, self.net_conv_kernel_sizes, False, True,
-                                            True)
         if torch.cuda.is_available():
             self.network.cuda()
         self.network.inference_apply_nonlin = softmax_helper
 
     def initialize_optimizer_and_scheduler(self):
         assert self.network is not None, "self.initialize_network must be called first"
-        print('weight_decay: ', self.weight_decay)
-        sys.stdout.flush()
-        self.optimizer = torch.optim.SGD(self.network.parameters(), self.initial_lr, weight_decay=self.weight_decay,
-                                         momentum=0.99, nesterov=True)
+        # self.optimizer = torch.optim.SGD(self.network.parameters(), self.initial_lr, weight_decay=self.weight_decay,
+        #                                 momentum=0.99, nesterov=True)
+        self.optimizer = torch.optim.AdamW(self.network.parameters(), self.initial_lr)
         self.lr_scheduler = None
-
-    def run_online_evaluation(self, output, target):
-        """
-        due to deep supervision the return value and the reference are now lists of tensors. We only need the full
-        resolution output because this is what we are interested in in the end. The others are ignored
-        :param output:
-        :param target:
-        :return:
-        """
-        target = target[0]
-        output = output[0]
-        return super().run_online_evaluation(output, target)
 
     def validate(self, do_mirroring: bool = True, use_sliding_window: bool = True,
                  step_size: float = 0.5, save_softmax: bool = True, use_gaussian: bool = True, overwrite: bool = True,
@@ -216,7 +172,8 @@ class nnUNetPlusPlusTrainerV2(nnUNetTrainer):
                                                          use_sliding_window: bool = True, step_size: float = 0.5,
                                                          use_gaussian: bool = True, pad_border_mode: str = 'constant',
                                                          pad_kwargs: dict = None, all_in_gpu: bool = False,
-                                                         verbose: bool = True, mixed_precision=True) -> Tuple[np.ndarray, np.ndarray]:
+                                                         verbose: bool = True, mixed_precision=True) -> Tuple[
+        np.ndarray, np.ndarray]:
         """
         We need to wrap this because we need to enforce self.network.do_ds = False for prediction
         """
@@ -260,6 +217,8 @@ class nnUNetPlusPlusTrainerV2(nnUNetTrainer):
             with autocast():
                 output = self.network(data)
                 del data
+                # print(len(output), len(target))
+                # print(output[0].shape, target[0].shape)
                 l = self.loss(output, target)
 
             if do_backprop:
@@ -287,62 +246,23 @@ class nnUNetPlusPlusTrainerV2(nnUNetTrainer):
 
     def do_split(self):
         """
-        The default split is a 5 fold CV on all available training cases. nnU-Net will create a split (it is seeded,
-        so always the same) and save it as splits_final.pkl file in the preprocessed data directory.
-        Sometimes you may want to create your own split for various reasons. For this you will need to create your own
-        splits_final.pkl file. If this file is present, nnU-Net is going to use it and whatever splits are defined in
-        it. You can create as many splits in this file as you want. Note that if you define only 4 splits (fold 0-3)
-        and then set fold=4 when training (that would be the fifth split), nnU-Net will print a warning and proceed to
-        use a random 80:20 data split.
-        :return:
+        Create a split and save it as splits_final.pkl file in the preprocessed data directory.
         """
-        if self.fold == "all":
-            # if fold==all then we use all images for training and validation
-            tr_keys = val_keys = list(self.dataset.keys())
-        else:
-            splits_file = join(self.dataset_directory, "splits_final.pkl")
+        # if the split file does not exist we need to create it
+        if not isfile(join(self.dataset_directory, "splits_final.pkl")):
+            shutil.copy('../../../data/splits_final.pkl', self.dataset_directory)
 
-            # if the split file does not exist we need to create it
-            if not isfile(splits_file):
-                self.print_to_log_file("Creating new 5-fold cross-validation split...")
-                splits = []
-                all_keys_sorted = np.sort(list(self.dataset.keys()))
-                kfold = KFold(n_splits=5, shuffle=True, random_state=12345)
-                for i, (train_idx, test_idx) in enumerate(kfold.split(all_keys_sorted)):
-                    train_keys = np.array(all_keys_sorted)[train_idx]
-                    test_keys = np.array(all_keys_sorted)[test_idx]
-                    splits.append(OrderedDict())
-                    splits[-1]['train'] = train_keys
-                    splits[-1]['val'] = test_keys
-                save_pickle(splits, splits_file)
+        splits_file = join(self.dataset_directory, "splits_final.pkl")
+        splits = load_pickle(splits_file)
 
-            else:
-                self.print_to_log_file("Using splits from existing split file:", splits_file)
-                splits = load_pickle(splits_file)
-                self.print_to_log_file("The split file contains %d splits." % len(splits))
-
-            self.print_to_log_file("Desired fold for training: %d" % self.fold)
-            if self.fold < len(splits):
-                tr_keys = splits[self.fold]['train']
-                val_keys = splits[self.fold]['val']
-                self.print_to_log_file("This split has %d training and %d validation cases."
-                                       % (len(tr_keys), len(val_keys)))
-            else:
-                self.print_to_log_file("INFO: You requested fold %d for training but splits "
-                                       "contain only %d folds. I am now creating a "
-                                       "random (but seeded) 80:20 split!" % (self.fold, len(splits)))
-                # if we request a fold that is not in the split file, create a random 80:20 split
-                rnd = np.random.RandomState(seed=12345 + self.fold)
-                keys = np.sort(list(self.dataset.keys()))
-                idx_tr = rnd.choice(len(keys), int(len(keys) * 0.8), replace=False)
-                idx_val = [i for i in range(len(keys)) if i not in idx_tr]
-                tr_keys = [keys[i] for i in idx_tr]
-                val_keys = [keys[i] for i in idx_val]
-                self.print_to_log_file("This random 80:20 split has %d training and %d validation cases."
-                                       % (len(tr_keys), len(val_keys)))
+        tr_keys = splits[0]['train']
+        val_keys = splits[0]['val']
 
         tr_keys.sort()
         val_keys.sort()
+        print("Current train-val split is ...")
+        print('Training set is %s' % tr_keys)
+        print('Validation set is %s \n' % val_keys)
         self.dataset_tr = OrderedDict()
         for i in tr_keys:
             self.dataset_tr[i] = self.dataset[i]
@@ -359,14 +279,10 @@ class nnUNetPlusPlusTrainerV2(nnUNetTrainer):
         :return:
         """
 
-        # self.deep_supervision_scales = [[1, 1, 1]] + list(list(i) for i in 1 / np.cumprod(
-        #     np.vstack(self.net_num_pool_op_kernel_sizes), axis=0))[:-1]
+        self.downsampe_scales = [[1, 2, 2], [2, 2, 2], [2, 2, 2], [2, 2, 2]]
+        self.deep_supervision_scales = [[1, 1, 1]] + list(list(i) for i in 1 / np.cumprod(
+            np.vstack(self.downsampe_scales), axis=0))[:-1]
 
-        # anning 将深度监督的scales改为不下采样，且去掉一个stage
-        # self.deep_supervision_scales = [[1, 1, 1]] + [[1, 1, 1]] * len(list(list(i) for i in 1 / np.cumprod(
-        #     np.vstack(self.net_num_pool_op_kernel_sizes), axis=0))[:-1])
-        self.deep_supervision_scales = [[1, 1, 1]] * len(list(list(i) for i in 1 / np.cumprod(
-            np.vstack(self.net_num_pool_op_kernel_sizes), axis=0))[:-1])
         if self.threeD:
             self.data_aug_params = default_3D_augmentation_params
             self.data_aug_params['rotation_x'] = (-30. / 360 * 2. * np.pi, 30. / 360 * 2. * np.pi)
@@ -434,7 +350,7 @@ class nnUNetPlusPlusTrainerV2(nnUNetTrainer):
         super().on_epoch_end()
         continue_training = self.epoch < self.max_num_epochs
 
-        # it can rarely happen that the momentum of nnUNetTrainerV2_plus is too high for some dataset. If at epoch 100 the
+        # it can rarely happen that the momentum of nnUNetTrainerV2 is too high for some dataset. If at epoch 100 the
         # estimated validation Dice is still 0 then we reduce the momentum from 0.99 to 0.95
         if self.epoch == 100:
             if self.all_val_eval_metrics[-1] == 0:
@@ -461,3 +377,43 @@ class nnUNetPlusPlusTrainerV2(nnUNetTrainer):
         ret = super().run_training()
         self.network.do_ds = ds
         return ret
+
+
+class nnUNetCoTrResTransTrainerV2BraTS_Adam_160(nnUNetTrainerV2_CoTr_ResTrans):
+
+    def __init__(self, plans_file, fold, output_folder=None, dataset_directory=None, batch_dice=True, stage=None,
+                 unpack_data=True, deterministic=True, fp16=False):
+        super().__init__(plans_file, fold, output_folder, dataset_directory, batch_dice, stage, unpack_data,
+                         deterministic, fp16)
+        self.max_num_epochs = 160
+        self.patience = 30
+        self.initial_lr = 1e-3
+        self.deep_supervision_scales = None
+        self.ds_loss_weights = None
+
+        self.norm_cfg = "IN"
+        self.activation_cfg = "LeakyReLU"
+
+        self.pin_memory = True
+
+        self.save_best_checkpoint = True
+
+
+class nnUNetCoTrResTransTrainerV2BraTS_Adam_320(nnUNetTrainerV2_CoTr_ResTrans):
+
+    def __init__(self, plans_file, fold, output_folder=None, dataset_directory=None, batch_dice=True, stage=None,
+                 unpack_data=True, deterministic=True, fp16=False):
+        super().__init__(plans_file, fold, output_folder, dataset_directory, batch_dice, stage, unpack_data,
+                         deterministic, fp16)
+        self.max_num_epochs = 320
+        self.patience = 30
+        self.initial_lr = 1e-3
+        self.deep_supervision_scales = None
+        self.ds_loss_weights = None
+
+        self.norm_cfg = "IN"
+        self.activation_cfg = "LeakyReLU"
+
+        self.pin_memory = True
+
+        self.save_best_checkpoint = True
