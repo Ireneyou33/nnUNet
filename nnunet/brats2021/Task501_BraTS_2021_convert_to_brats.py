@@ -45,14 +45,17 @@ if __name__ == "__main__":
         expected_num_cases=219
         assert len(subfiles(data_dir_pred, suffix='.nii.gz', join=False)) == expected_num_cases, "数据文件不符合要求"
 
-        convert_all_to_BraTS(data_dir_pred, data_dir_out)
-
         # 将结果文件压缩为tar文件    
         pre_dir = os.path.basename(os.path.dirname(data_dir_pred))
         pre_pre_dir = os.path.basename(os.path.dirname(os.path.dirname(data_dir_pred)))
         tar_filename = f"{pre_pre_dir}_{pre_dir}.tar"
         tar_file = join(tar_dir, tar_filename)
 
+        if os.path.isfile(tar_file):
+            continue
+
+        convert_all_to_BraTS(data_dir_pred, data_dir_out)
+        
         if not os.path.isdir(tar_dir):
             os.makedirs(tar_dir)
         if os.path.isfile(tar_file):

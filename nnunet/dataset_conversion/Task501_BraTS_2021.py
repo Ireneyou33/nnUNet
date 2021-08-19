@@ -95,7 +95,14 @@ def determine_brats_postprocessing(folder_with_preds, folder_with_gt, postproces
 
     nifti_pred = subfiles(folder_with_preds, suffix='.nii.gz', sort=True)
 
-    results = p.starmap_async(load_niftis_threshold_compute_dice, zip(nifti_gt, nifti_pred, [thresholds] * len(nifti_pred)))
+    nifti_gt_filter = []
+    for pred_file in nifti_pred:
+        file_name = os.path.basename(pred_file)
+        nifti_gt_filter.append(join(folder_with_gt, file_name))
+
+    assert len(nifti_gt_filter) == len(nifti_pred)
+
+    results = p.starmap_async(load_niftis_threshold_compute_dice, zip(nifti_gt_filter, nifti_pred, [thresholds] * len(nifti_pred)))
     results = results.get()
 
     all_dc_per_threshold = {}
