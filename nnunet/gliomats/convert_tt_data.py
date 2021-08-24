@@ -6,24 +6,17 @@ import numpy as np
 from collections import OrderedDict
 
 from batchgenerators.utilities.file_and_folder_operations import *
-import scipy.stats as ss
 
-from nnunet.dataset_conversion.Task032_BraTS_2018 import convert_labels_back_to_BraTS_2018_2019_convention
-from nnunet.dataset_conversion.Task043_BraTS_2019 import copy_BraTS_segmentation_and_convert_labels
-from nnunet.evaluation.region_based_evaluation import get_brats_regions, evaluate_regions
 from nnunet.paths import nnUNet_raw_data
 import SimpleITK as sitk
-import shutil
 from medpy.metric import dc, hd95
 
-from nnunet.postprocessing.consolidate_postprocessing import collect_cv_niftis
-from typing import Tuple
 
 
 def convert_seg(in_file, out_file):
     img = sitk.ReadImage(in_file)
     img_npy = sitk.GetArrayFromImage(img)
-    for i in [2, 3]:
+    for i in [2, 3]:  # 将2、3标签转为1
         img_npy[img_npy == i] = 1
     img_corr = sitk.GetImageFromArray(img_npy)
     img_corr.CopyInformation(img)
@@ -39,30 +32,41 @@ def print_seg(in_file):
         print(f"{(img_npy == 2).sum()}, {(img_npy == 3).sum()}")
 
 
-def copy_and_compress_ttbrats_data(in_file, out_file):
+def copy_and_compress_ttbrats_data(in_file, out_file, target_file=None):
     img = sitk.ReadImage(in_file)
     img_npy = sitk.GetArrayFromImage(img)
     img_corr = sitk.GetImageFromArray(img_npy)
-    img_corr.CopyInformation(img)
+    if target_file is not None:
+        img_corr.CopyInformation(sitk.ReadImage(target_file))  # 拷贝target_file的文件信息
+    else:
+        img_corr.CopyInformation(img)
     sitk.WriteImage(img_corr, out_file)
     print(f"out_file : {out_file}")
 
 
 def convert_data(in_file, target_file, out_file):
-    image_info_in = ants.image_header_info(in_file)
-    image_info_target = ants.image_header_info(target_file)
-
     in_file_resample = out_file + "resample.nii"
 
-    if not (image_info_in["dimensions"] == image_info_target["dimensions"] and
-            image_info_in["origin"] == image_info_target["origin"]):
+    # image_info_in = ants.image_header_info(in_file)
+    # image_info_target = ants.image_header_info(target_file)
+    # if not (image_info_in["dimensions"] == image_info_target["dimensions"] and
+    #         image_info_in["spacing"] == image_info_target["spacing"] and
+    #         image_info_in["origin"] == image_info_target["origin"] and
+    #         tuple(image_info_in["direction"].flatten()) == tuple(image_info_target["direction"].flatten())):
+    #     image_in = ants.image_read(in_file)
+    #     image_target = ants.image_read(target_file)
+    #     image_in_resample = ants.resample_image_to_target(image_in, image_target)
+    #     ants.image_write(image_in_resample, in_file_resample)
+
+    if not "tu_mask" in in_file:  # 如果不是label数据，进行标签转换
         image_in = ants.image_read(in_file)
         image_target = ants.image_read(target_file)
-        image_in_resample = ants.resample_image_to_target(image_in, image_target)
+        # 转换非标签数据，使用linear的插值方式
+        image_in_resample = ants.resample_image_to_target(image_in, image_target, interp_type='linear')
         ants.image_write(image_in_resample, in_file_resample)
 
     if os.path.isfile(in_file_resample):
-        copy_and_compress_ttbrats_data(in_file_resample, out_file)
+        copy_and_compress_ttbrats_data(in_file_resample, out_file, target_file)
         os.system(f"rm {in_file_resample}")
     else:
         copy_and_compress_ttbrats_data(in_file, out_file)
@@ -131,7 +135,7 @@ if __name__ == "__main__":
 
         # convet_data_floder(patdir, patient_name)
 
-    thread = 4
+    thread = 8
     pool = Pool(thread)
     pool.starmap(convet_data_floder, zip(patdirs, patient_names))
     pool.close()
